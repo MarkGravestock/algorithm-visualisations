@@ -211,9 +211,9 @@ class GraphVisualizer {
     }
 
     calculateFitScale(svgRect, bounds) {
-        const scaleX = (svgRect.width - 100) / bounds.graphWidth;
-        const scaleY = (svgRect.height - 100) / bounds.graphHeight;
-        return Math.min(scaleX, scaleY, 1.2);
+        const scaleX = (svgRect.width - 200) / bounds.graphWidth;
+        const scaleY = (svgRect.height - 200) / bounds.graphHeight;
+        return Math.min(scaleX, scaleY, 1.0);
     }
 
     calculateCenteringOffsets(svgRect, bounds) {
@@ -493,6 +493,12 @@ class AnimationController {
         if (!step.data.skipped) {
             this.visualizer.highlightEdge(step.data.from, step.data.to, 'active');
             this.visualizer.highlightNode(step.data.to, 'visiting');
+        } else if (step.data.reason === 'in-current-path') {
+            this.visualizer.highlightEdge(step.data.from, step.data.to, 'cycle');
+            this.visualizer.highlightNode(step.data.to, 'cycle');
+        } else if (step.data.reason === 'globally-used') {
+            this.visualizer.highlightEdge(step.data.from, step.data.to, 'skipped');
+            this.visualizer.highlightNode(step.data.to, 'skipped');
         }
         if (step.data.path) {
             this.highlightCurrentPath(step.data.path);
