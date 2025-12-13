@@ -1,10 +1,29 @@
-// Algorithm implementations with step-by-step tracking
-
 class AlgorithmStep {
     constructor(type, data, description) {
-        this.type = type;  // 'visit', 'backtrack', 'path-found', 'explore-edge', 'complete'
+        this.type = type;
         this.data = data;
         this.description = description;
+    }
+}
+
+class GraphAnalyzer {
+    static findSourceNode(graph) {
+        const nodesWithIncoming = new Set();
+        graph.edges.forEach(edge => nodesWithIncoming.add(edge.to));
+        return graph.nodes.find(n => !nodesWithIncoming.has(n.id))?.id;
+    }
+
+    static findSinkNode(graph) {
+        return graph.nodes.find(n => graph.getNeighbors(n.id).length === 0)?.id;
+    }
+
+    static validateSourceAndSink(sourceId, sinkId, steps, allPaths) {
+        if (sourceId === undefined || sinkId === undefined) {
+            steps.push(new AlgorithmStep('complete', {},
+                'Error: Could not identify source or sink node'));
+            return { steps, paths: allPaths, isValid: false };
+        }
+        return { isValid: true };
     }
 }
 
@@ -17,39 +36,18 @@ const Algorithms = {
             const steps = [];
             const allPaths = [];
 
-            // Auto-detect source and sink if not provided
-            if (sourceId === null) {
-                // Source is a node with no incoming edges
-                const nodesWithIncoming = new Set();
-                graph.edges.forEach(edge => nodesWithIncoming.add(edge.to));
-                sourceId = graph.nodes.find(n => !nodesWithIncoming.has(n.id))?.id;
-            }
+            sourceId = sourceId ?? GraphAnalyzer.findSourceNode(graph);
+            sinkId = sinkId ?? GraphAnalyzer.findSinkNode(graph);
 
-            if (sinkId === null) {
-                // Sink is a node with no outgoing edges
-                sinkId = graph.nodes.find(n =>
-                    graph.getNeighbors(n.id).length === 0
-                )?.id;
-            }
+            const validation = GraphAnalyzer.validateSourceAndSink(sourceId, sinkId, steps, allPaths);
+            if (!validation.isValid) return validation;
 
-            if (sourceId === undefined || sinkId === undefined) {
-                steps.push(new AlgorithmStep('complete', {},
-                    'Error: Could not identify source or sink node'));
-                return { steps, paths: allPaths };
-            }
+            this.recordStartStep(steps, sourceId, sinkId);
 
-            steps.push(new AlgorithmStep('visit', {
-                nodeId: sourceId,
-                path: [sourceId],
-                action: 'start'
-            }, `Starting DFS from node ${sourceId} to find all paths to node ${sinkId}`));
-
-            // Recursive DFS function
-            function dfs(currentId, currentPath, visited) {
-                // Check if we reached the sink
-                if (currentId === sinkId) {
+            const dfsExplorer = {
+                recordSinkReached: (currentPath) => {
                     steps.push(new AlgorithmStep('visit', {
-                        nodeId: currentId,
+                        nodeId: sinkId,
                         path: currentPath,
                         action: 'sink-reached'
                     }, `Reached sink node ${sinkId}`));
@@ -61,61 +59,75 @@ const Algorithms = {
                         path: pathCopy,
                         pathIndex: allPaths.length - 1
                     }, `Found complete path ${allPaths.length}: ${pathCopy.join(' → ')}`));
+                },
 
-                    return;
-                }
+                recordExplorationStart: (currentId, currentPath, neighbors) => {
+                    steps.push(new AlgorithmStep('visit', {
+                        nodeId: currentId,
+                        path: [...currentPath],
+                        neighbors: neighbors,
+                        action: 'explore'
+                    }, `Exploring neighbors of node ${currentId}: [${neighbors.join(', ')}]`));
+                },
 
-                // Get neighbors
-                const neighbors = graph.getNeighbors(currentId);
+                recordSkippedNode: (currentId, neighborId, currentPath) => {
+                    steps.push(new AlgorithmStep('explore-edge', {
+                        from: currentId,
+                        to: neighborId,
+                        path: [...currentPath],
+                        skipped: true,
+                        reason: 'in-current-path'
+                    }, `Skipping node ${neighborId} - already in current path`));
+                },
 
-                steps.push(new AlgorithmStep('visit', {
-                    nodeId: currentId,
-                    path: [...currentPath],
-                    neighbors: neighbors,
-                    action: 'explore'
-                }, `Exploring neighbors of node ${currentId}: [${neighbors.join(', ')}]`));
-
-                // Explore each neighbor
-                for (const neighborId of neighbors) {
-                    // Skip if already visited in current path (prevents cycles)
-                    if (visited.has(neighborId)) {
-                        steps.push(new AlgorithmStep('explore-edge', {
-                            from: currentId,
-                            to: neighborId,
-                            path: [...currentPath],
-                            skipped: true,
-                            reason: 'in-current-path'
-                        }, `Skipping node ${neighborId} - already in current path`));
-                        continue;
-                    }
-
-                    // Explore this neighbor
+                recordEdgeTraversal: (currentId, neighborId, currentPath) => {
                     steps.push(new AlgorithmStep('explore-edge', {
                         from: currentId,
                         to: neighborId,
                         path: [...currentPath],
                         skipped: false
                     }, `Traversing edge ${currentId} → ${neighborId}`));
+                },
 
-                    const newPath = [...currentPath, neighborId];
-                    const newVisited = new Set(visited);
-                    newVisited.add(neighborId);
+                recordBacktrack: (currentId, currentPath) => {
+                    if (currentId !== sourceId) {
+                        steps.push(new AlgorithmStep('backtrack', {
+                            nodeId: currentId,
+                            path: [...currentPath]
+                        }, `Backtracking from node ${currentId}`));
+                    }
+                },
 
-                    dfs(neighborId, newPath, newVisited);
+                exploreFrom: function(currentId, currentPath, visited) {
+                    if (currentId === sinkId) {
+                        this.recordSinkReached(currentPath);
+                        return;
+                    }
+
+                    const neighbors = graph.getNeighbors(currentId);
+                    this.recordExplorationStart(currentId, currentPath, neighbors);
+
+                    for (const neighborId of neighbors) {
+                        if (visited.has(neighborId)) {
+                            this.recordSkippedNode(currentId, neighborId, currentPath);
+                            continue;
+                        }
+
+                        this.recordEdgeTraversal(currentId, neighborId, currentPath);
+
+                        const newPath = [...currentPath, neighborId];
+                        const newVisited = new Set(visited);
+                        newVisited.add(neighborId);
+
+                        this.exploreFrom(neighborId, newPath, newVisited);
+                    }
+
+                    this.recordBacktrack(currentId, currentPath);
                 }
+            };
 
-                // Backtrack
-                if (currentId !== sourceId) {
-                    steps.push(new AlgorithmStep('backtrack', {
-                        nodeId: currentId,
-                        path: [...currentPath]
-                    }, `Backtracking from node ${currentId}`));
-                }
-            }
-
-            // Start DFS
             const initialVisited = new Set([sourceId]);
-            dfs(sourceId, [sourceId], initialVisited);
+            dfsExplorer.exploreFrom(sourceId, [sourceId], initialVisited);
 
             steps.push(new AlgorithmStep('complete', {
                 totalPaths: allPaths.length,
@@ -123,6 +135,14 @@ const Algorithms = {
             }, `Search complete! Found ${allPaths.length} path(s) from ${sourceId} to ${sinkId}`));
 
             return { steps, paths: allPaths };
+        },
+
+        recordStartStep: function(steps, sourceId, sinkId) {
+            steps.push(new AlgorithmStep('visit', {
+                nodeId: sourceId,
+                path: [sourceId],
+                action: 'start'
+            }, `Starting DFS from node ${sourceId} to find all paths to node ${sinkId}`));
         }
     },
 
@@ -134,26 +154,11 @@ const Algorithms = {
             const steps = [];
             const allPaths = [];
 
-            // Auto-detect source and sink if not provided
-            if (sourceId === null) {
-                // Source is a node with no incoming edges
-                const nodesWithIncoming = new Set();
-                graph.edges.forEach(edge => nodesWithIncoming.add(edge.to));
-                sourceId = graph.nodes.find(n => !nodesWithIncoming.has(n.id))?.id;
-            }
+            sourceId = sourceId ?? GraphAnalyzer.findSourceNode(graph);
+            sinkId = sinkId ?? GraphAnalyzer.findSinkNode(graph);
 
-            if (sinkId === null) {
-                // Sink is a node with no outgoing edges
-                sinkId = graph.nodes.find(n =>
-                    graph.getNeighbors(n.id).length === 0
-                )?.id;
-            }
-
-            if (sourceId === undefined || sinkId === undefined) {
-                steps.push(new AlgorithmStep('complete', {},
-                    'Error: Could not identify source or sink node'));
-                return { steps, paths: allPaths };
-            }
+            const validation = GraphAnalyzer.validateSourceAndSink(sourceId, sinkId, steps, allPaths);
+            if (!validation.isValid) return validation;
 
             steps.push(new AlgorithmStep('visit', {
                 nodeId: sourceId,
@@ -161,15 +166,22 @@ const Algorithms = {
                 action: 'start'
             }, `Starting DFS from node ${sourceId} to find node-disjoint paths to node ${sinkId}`));
 
-            // Track globally used nodes across all found paths
             const globallyUsedNodes = new Set([sourceId, sinkId]);
 
-            // Recursive DFS function
-            function dfs(currentId, currentPath, visited) {
-                // Check if we reached the sink
-                if (currentId === sinkId) {
+            const disjointExplorer = {
+                markPathNodesAsUsed: (pathCopy) => {
+                    for (let i = 1; i < pathCopy.length - 1; i++) {
+                        globallyUsedNodes.add(pathCopy[i]);
+                    }
+                },
+
+                isNodeGloballyUsed: (neighborId) => {
+                    return globallyUsedNodes.has(neighborId) && neighborId !== sinkId;
+                },
+
+                recordSinkReached: (currentPath) => {
                     steps.push(new AlgorithmStep('visit', {
-                        nodeId: currentId,
+                        nodeId: sinkId,
                         path: currentPath,
                         action: 'sink-reached'
                     }, `Reached sink node ${sinkId}`));
@@ -182,77 +194,86 @@ const Algorithms = {
                         pathIndex: allPaths.length - 1
                     }, `Found node-disjoint path ${allPaths.length}: ${pathCopy.join(' → ')}`));
 
-                    // Mark all nodes in this path (except source and sink) as globally used
-                    for (let i = 1; i < pathCopy.length - 1; i++) {
-                        globallyUsedNodes.add(pathCopy[i]);
-                    }
+                    this.markPathNodesAsUsed(pathCopy);
+                },
 
-                    return;
-                }
+                recordExplorationStart: (currentId, currentPath, neighbors) => {
+                    steps.push(new AlgorithmStep('visit', {
+                        nodeId: currentId,
+                        path: [...currentPath],
+                        neighbors: neighbors,
+                        action: 'explore'
+                    }, `Exploring neighbors of node ${currentId}: [${neighbors.join(', ')}]`));
+                },
 
-                // Get neighbors
-                const neighbors = graph.getNeighbors(currentId);
+                recordSkippedNode: (currentId, neighborId, currentPath, reason) => {
+                    const messages = {
+                        'in-current-path': `Skipping node ${neighborId} - already in current path`,
+                        'globally-used': `Skipping node ${neighborId} - used in another path`
+                    };
 
-                steps.push(new AlgorithmStep('visit', {
-                    nodeId: currentId,
-                    path: [...currentPath],
-                    neighbors: neighbors,
-                    action: 'explore'
-                }, `Exploring neighbors of node ${currentId}: [${neighbors.join(', ')}]`));
+                    steps.push(new AlgorithmStep('explore-edge', {
+                        from: currentId,
+                        to: neighborId,
+                        path: [...currentPath],
+                        skipped: true,
+                        reason: reason
+                    }, messages[reason]));
+                },
 
-                // Explore each neighbor
-                for (const neighborId of neighbors) {
-                    // Skip if already visited in current path
-                    if (visited.has(neighborId)) {
-                        steps.push(new AlgorithmStep('explore-edge', {
-                            from: currentId,
-                            to: neighborId,
-                            path: [...currentPath],
-                            skipped: true,
-                            reason: 'in-current-path'
-                        }, `Skipping node ${neighborId} - already in current path`));
-                        continue;
-                    }
-
-                    // Skip if used in another found path (except if it's the sink)
-                    if (globallyUsedNodes.has(neighborId) && neighborId !== sinkId) {
-                        steps.push(new AlgorithmStep('explore-edge', {
-                            from: currentId,
-                            to: neighborId,
-                            path: [...currentPath],
-                            skipped: true,
-                            reason: 'globally-used'
-                        }, `Skipping node ${neighborId} - used in another path`));
-                        continue;
-                    }
-
-                    // Explore this neighbor
+                recordEdgeTraversal: (currentId, neighborId, currentPath) => {
                     steps.push(new AlgorithmStep('explore-edge', {
                         from: currentId,
                         to: neighborId,
                         path: [...currentPath],
                         skipped: false
                     }, `Traversing edge ${currentId} → ${neighborId}`));
+                },
 
-                    const newPath = [...currentPath, neighborId];
-                    const newVisited = new Set(visited);
-                    newVisited.add(neighborId);
+                recordBacktrack: (currentId, currentPath) => {
+                    if (currentId !== sourceId) {
+                        steps.push(new AlgorithmStep('backtrack', {
+                            nodeId: currentId,
+                            path: [...currentPath]
+                        }, `Backtracking from node ${currentId}`));
+                    }
+                },
 
-                    dfs(neighborId, newPath, newVisited);
+                exploreFrom: function(currentId, currentPath, visited) {
+                    if (currentId === sinkId) {
+                        this.recordSinkReached(currentPath);
+                        return;
+                    }
+
+                    const neighbors = graph.getNeighbors(currentId);
+                    this.recordExplorationStart(currentId, currentPath, neighbors);
+
+                    for (const neighborId of neighbors) {
+                        if (visited.has(neighborId)) {
+                            this.recordSkippedNode(currentId, neighborId, currentPath, 'in-current-path');
+                            continue;
+                        }
+
+                        if (this.isNodeGloballyUsed(neighborId)) {
+                            this.recordSkippedNode(currentId, neighborId, currentPath, 'globally-used');
+                            continue;
+                        }
+
+                        this.recordEdgeTraversal(currentId, neighborId, currentPath);
+
+                        const newPath = [...currentPath, neighborId];
+                        const newVisited = new Set(visited);
+                        newVisited.add(neighborId);
+
+                        this.exploreFrom(neighborId, newPath, newVisited);
+                    }
+
+                    this.recordBacktrack(currentId, currentPath);
                 }
+            };
 
-                // Backtrack
-                if (currentId !== sourceId) {
-                    steps.push(new AlgorithmStep('backtrack', {
-                        nodeId: currentId,
-                        path: [...currentPath]
-                    }, `Backtracking from node ${currentId}`));
-                }
-            }
-
-            // Start DFS
             const initialVisited = new Set([sourceId]);
-            dfs(sourceId, [sourceId], initialVisited);
+            disjointExplorer.exploreFrom(sourceId, [sourceId], initialVisited);
 
             steps.push(new AlgorithmStep('complete', {
                 totalPaths: allPaths.length,
@@ -270,26 +291,13 @@ const Algorithms = {
         execute: function(graph, sourceId = null, sinkId = null) {
             const steps = [];
             const allPaths = [];
-            const memo = new Map(); // Cache: nodeId -> array of paths from that node to sink
+            const memo = new Map();
 
-            // Auto-detect source and sink if not provided
-            if (sourceId === null) {
-                const nodesWithIncoming = new Set();
-                graph.edges.forEach(edge => nodesWithIncoming.add(edge.to));
-                sourceId = graph.nodes.find(n => !nodesWithIncoming.has(n.id))?.id;
-            }
+            sourceId = sourceId ?? GraphAnalyzer.findSourceNode(graph);
+            sinkId = sinkId ?? GraphAnalyzer.findSinkNode(graph);
 
-            if (sinkId === null) {
-                sinkId = graph.nodes.find(n =>
-                    graph.getNeighbors(n.id).length === 0
-                )?.id;
-            }
-
-            if (sourceId === undefined || sinkId === undefined) {
-                steps.push(new AlgorithmStep('complete', {},
-                    'Error: Could not identify source or sink node'));
-                return { steps, paths: allPaths };
-            }
+            const validation = GraphAnalyzer.validateSourceAndSink(sourceId, sinkId, steps, allPaths);
+            if (!validation.isValid) return validation;
 
             steps.push(new AlgorithmStep('visit', {
                 nodeId: sourceId,
@@ -297,17 +305,14 @@ const Algorithms = {
                 action: 'start'
             }, `Starting memoized DFS from node ${sourceId} to find all paths to node ${sinkId}`));
 
-            // Recursive DFS with memoization
-            function dfs(currentId, currentPath, usedCache) {
-                // Check if we reached the sink
-                if (currentId === sinkId) {
+            const memoizedExplorer = {
+                recordSinkReached: (currentPath, usedCache) => {
                     steps.push(new AlgorithmStep('visit', {
-                        nodeId: currentId,
+                        nodeId: sinkId,
                         path: currentPath,
                         action: 'sink-reached'
                     }, `Reached sink node ${sinkId}`));
 
-                    // If we're completing a path from source to sink, record it
                     if (currentPath.length > 0) {
                         allPaths.push([...currentPath]);
                         steps.push(new AlgorithmStep('path-found', {
@@ -316,14 +321,9 @@ const Algorithms = {
                             fromCache: usedCache
                         }, `Found complete path ${allPaths.length}: ${currentPath.join(' → ')}${usedCache ? ' (via cache)' : ''}`));
                     }
+                },
 
-                    return [[sinkId]];
-                }
-
-                // Check memo cache
-                if (memo.has(currentId)) {
-                    const cachedPaths = memo.get(currentId);
-
+                recordCacheHit: (currentId, currentPath, cachedPaths) => {
                     steps.push(new AlgorithmStep('visit', {
                         nodeId: currentId,
                         path: currentPath,
@@ -331,7 +331,6 @@ const Algorithms = {
                         cachedPathCount: cachedPaths.length
                     }, `Cache hit! Node ${currentId} has ${cachedPaths.length} cached path(s) to sink - reusing results`));
 
-                    // If we're at a point where we can construct complete paths, emit them
                     if (currentPath.length > 0) {
                         for (const cachedPath of cachedPaths) {
                             const completePath = [...currentPath.slice(0, -1), ...cachedPath];
@@ -343,54 +342,69 @@ const Algorithms = {
                             }, `Found complete path ${allPaths.length}: ${completePath.join(' → ')} (via cache)`));
                         }
                     }
+                },
 
-                    // Return cached paths (they already include currentId)
-                    return cachedPaths;
-                }
+                recordCacheMiss: (currentId, currentPath) => {
+                    steps.push(new AlgorithmStep('visit', {
+                        nodeId: currentId,
+                        path: currentPath,
+                        action: 'explore'
+                    }, `Cache miss - exploring neighbors of node ${currentId}`));
+                },
 
-                // Cache miss - need to compute
-                steps.push(new AlgorithmStep('visit', {
-                    nodeId: currentId,
-                    path: currentPath,
-                    action: 'explore'
-                }, `Cache miss - exploring neighbors of node ${currentId}`));
-
-                const neighbors = graph.getNeighbors(currentId);
-                const pathsFromHere = [];
-
-                // Explore each neighbor
-                for (const neighborId of neighbors) {
+                recordEdgeTraversal: (currentId, neighborId, currentPath) => {
                     steps.push(new AlgorithmStep('explore-edge', {
                         from: currentId,
                         to: neighborId,
                         path: currentPath,
                         skipped: false
                     }, `Traversing edge ${currentId} → ${neighborId}`));
+                },
 
-                    const newPath = [...currentPath, neighborId];
-                    const pathsFromNeighbor = dfs(neighborId, newPath, usedCache);
+                recordCacheStore: (currentId, currentPath, pathsFromHere) => {
+                    steps.push(new AlgorithmStep('backtrack', {
+                        nodeId: currentId,
+                        path: currentPath,
+                        cachedCount: pathsFromHere.length
+                    }, `Cached ${pathsFromHere.length} path(s) from node ${currentId} to sink`));
+                },
 
-                    // Combine paths: currentId + each path from neighbor
-                    for (const pathFromNeighbor of pathsFromNeighbor) {
-                        const fullPath = [currentId, ...pathFromNeighbor];
-                        pathsFromHere.push(fullPath);
+                exploreFrom: function(currentId, currentPath, usedCache) {
+                    if (currentId === sinkId) {
+                        this.recordSinkReached(currentPath, usedCache);
+                        return [[sinkId]];
                     }
+
+                    if (memo.has(currentId)) {
+                        const cachedPaths = memo.get(currentId);
+                        this.recordCacheHit(currentId, currentPath, cachedPaths);
+                        return cachedPaths;
+                    }
+
+                    this.recordCacheMiss(currentId, currentPath);
+
+                    const neighbors = graph.getNeighbors(currentId);
+                    const pathsFromHere = [];
+
+                    for (const neighborId of neighbors) {
+                        this.recordEdgeTraversal(currentId, neighborId, currentPath);
+
+                        const newPath = [...currentPath, neighborId];
+                        const pathsFromNeighbor = this.exploreFrom(neighborId, newPath, usedCache);
+
+                        for (const pathFromNeighbor of pathsFromNeighbor) {
+                            pathsFromHere.push([currentId, ...pathFromNeighbor]);
+                        }
+                    }
+
+                    memo.set(currentId, pathsFromHere);
+                    this.recordCacheStore(currentId, currentPath, pathsFromHere);
+
+                    return pathsFromHere;
                 }
+            };
 
-                // Cache the results
-                memo.set(currentId, pathsFromHere);
-
-                steps.push(new AlgorithmStep('backtrack', {
-                    nodeId: currentId,
-                    path: currentPath,
-                    cachedCount: pathsFromHere.length
-                }, `Cached ${pathsFromHere.length} path(s) from node ${currentId} to sink`));
-
-                return pathsFromHere;
-            }
-
-            // Start DFS
-            dfs(sourceId, [sourceId], false);
+            memoizedExplorer.exploreFrom(sourceId, [sourceId], false);
 
             steps.push(new AlgorithmStep('complete', {
                 totalPaths: allPaths.length,
@@ -410,24 +424,11 @@ const Algorithms = {
             const steps = [];
             const allPaths = [];
 
-            // Auto-detect source and sink if not provided
-            if (sourceId === null) {
-                const nodesWithIncoming = new Set();
-                graph.edges.forEach(edge => nodesWithIncoming.add(edge.to));
-                sourceId = graph.nodes.find(n => !nodesWithIncoming.has(n.id))?.id;
-            }
+            sourceId = sourceId ?? GraphAnalyzer.findSourceNode(graph);
+            sinkId = sinkId ?? GraphAnalyzer.findSinkNode(graph);
 
-            if (sinkId === null) {
-                sinkId = graph.nodes.find(n =>
-                    graph.getNeighbors(n.id).length === 0
-                )?.id;
-            }
-
-            if (sourceId === undefined || sinkId === undefined) {
-                steps.push(new AlgorithmStep('complete', {},
-                    'Error: Could not identify source or sink node'));
-                return { steps, paths: allPaths };
-            }
+            const validation = GraphAnalyzer.validateSourceAndSink(sourceId, sinkId, steps, allPaths);
+            if (!validation.isValid) return validation;
 
             steps.push(new AlgorithmStep('visit', {
                 nodeId: sourceId,
@@ -435,29 +436,28 @@ const Algorithms = {
                 action: 'start'
             }, `Starting BFS from node ${sourceId} to find all paths to node ${sinkId}`));
 
-            // BFS using a queue - each item is a path
             const queue = [[sourceId]];
 
-            steps.push(new AlgorithmStep('visit', {
-                nodeId: sourceId,
-                path: [sourceId],
-                action: 'enqueue'
-            }, `Enqueued initial path: [${sourceId}]`));
+            const bfsExplorer = {
+                recordEnqueue: (path) => {
+                    steps.push(new AlgorithmStep('visit', {
+                        nodeId: path[path.length - 1],
+                        path: path,
+                        action: 'enqueue'
+                    }, `Enqueued path: [${path.join(' → ')}]`));
+                },
 
-            while (queue.length > 0) {
-                const currentPath = queue.shift();
-                const currentId = currentPath[currentPath.length - 1];
-
-                steps.push(new AlgorithmStep('visit', {
-                    nodeId: currentId,
-                    path: currentPath,
-                    action: 'dequeue'
-                }, `Dequeued path: [${currentPath.join(' → ')}] - exploring from node ${currentId}`));
-
-                // Check if we reached the sink
-                if (currentId === sinkId) {
+                recordDequeue: (currentPath, currentId) => {
                     steps.push(new AlgorithmStep('visit', {
                         nodeId: currentId,
+                        path: currentPath,
+                        action: 'dequeue'
+                    }, `Dequeued path: [${currentPath.join(' → ')}] - exploring from node ${currentId}`));
+                },
+
+                recordSinkReached: (currentPath) => {
+                    steps.push(new AlgorithmStep('visit', {
+                        nodeId: sinkId,
                         path: currentPath,
                         action: 'sink-reached'
                     }, `Reached sink node ${sinkId}`));
@@ -468,51 +468,63 @@ const Algorithms = {
                         path: [...currentPath],
                         pathIndex: allPaths.length - 1
                     }, `Found complete path ${allPaths.length}: ${currentPath.join(' → ')}`));
+                },
 
-                    continue; // Don't explore further from sink
-                }
+                recordExplorationStart: (currentId, currentPath, neighbors) => {
+                    steps.push(new AlgorithmStep('visit', {
+                        nodeId: currentId,
+                        path: currentPath,
+                        neighbors: neighbors,
+                        action: 'explore'
+                    }, `Exploring neighbors of node ${currentId}: [${neighbors.join(', ')}]`));
+                },
 
-                // Get neighbors
-                const neighbors = graph.getNeighbors(currentId);
+                recordSkippedNode: (currentId, neighborId, currentPath) => {
+                    steps.push(new AlgorithmStep('explore-edge', {
+                        from: currentId,
+                        to: neighborId,
+                        path: currentPath,
+                        skipped: true,
+                        reason: 'in-current-path'
+                    }, `Skipping node ${neighborId} - already in current path`));
+                },
 
-                steps.push(new AlgorithmStep('visit', {
-                    nodeId: currentId,
-                    path: currentPath,
-                    neighbors: neighbors,
-                    action: 'explore'
-                }, `Exploring neighbors of node ${currentId}: [${neighbors.join(', ')}]`));
-
-                // Explore each neighbor
-                for (const neighborId of neighbors) {
-                    // Check if neighbor is already in current path (avoid cycles)
-                    if (currentPath.includes(neighborId)) {
-                        steps.push(new AlgorithmStep('explore-edge', {
-                            from: currentId,
-                            to: neighborId,
-                            path: currentPath,
-                            skipped: true,
-                            reason: 'in-current-path'
-                        }, `Skipping node ${neighborId} - already in current path`));
-                        continue;
-                    }
-
-                    // Create new path by extending current path
-                    const newPath = [...currentPath, neighborId];
-
+                recordEdgeTraversal: (currentId, neighborId, currentPath) => {
                     steps.push(new AlgorithmStep('explore-edge', {
                         from: currentId,
                         to: neighborId,
                         path: currentPath,
                         skipped: false
                     }, `Traversing edge ${currentId} → ${neighborId}`));
+                }
+            };
 
-                    steps.push(new AlgorithmStep('visit', {
-                        nodeId: neighborId,
-                        path: newPath,
-                        action: 'enqueue'
-                    }, `Enqueued path: [${newPath.join(' → ')}]`));
+            bfsExplorer.recordEnqueue([sourceId]);
 
-                    // Add new path to queue
+            while (queue.length > 0) {
+                const currentPath = queue.shift();
+                const currentId = currentPath[currentPath.length - 1];
+
+                bfsExplorer.recordDequeue(currentPath, currentId);
+
+                if (currentId === sinkId) {
+                    bfsExplorer.recordSinkReached(currentPath);
+                    continue;
+                }
+
+                const neighbors = graph.getNeighbors(currentId);
+                bfsExplorer.recordExplorationStart(currentId, currentPath, neighbors);
+
+                for (const neighborId of neighbors) {
+                    if (currentPath.includes(neighborId)) {
+                        bfsExplorer.recordSkippedNode(currentId, neighborId, currentPath);
+                        continue;
+                    }
+
+                    const newPath = [...currentPath, neighborId];
+                    bfsExplorer.recordEdgeTraversal(currentId, neighborId, currentPath);
+                    bfsExplorer.recordEnqueue(newPath);
+
                     queue.push(newPath);
                 }
             }
@@ -526,8 +538,3 @@ const Algorithms = {
         }
     }
 };
-
-// Future algorithms can be added here:
-// 'dijkstra': { ... },
-// 'topological-sort': { ... },
-// etc.
