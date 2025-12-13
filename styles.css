@@ -293,6 +293,13 @@ button:disabled {
     animation: cache-flash 0.5s ease-in-out;
 }
 
+.node-circle.cycle {
+    fill: #ff6b6b;
+    stroke: #ee5a52;
+    stroke-width: 4;
+    animation: cycle-pulse 1s ease-in-out;
+}
+
 @keyframes pulse {
     0%, 100% {
         transform: scale(1);
@@ -308,6 +315,17 @@ button:disabled {
     }
     50% {
         opacity: 0.6;
+    }
+}
+
+@keyframes cycle-pulse {
+    0%, 100% {
+        transform: scale(1);
+        opacity: 1;
+    }
+    50% {
+        transform: scale(1.15);
+        opacity: 0.8;
     }
 }
 
@@ -361,6 +379,22 @@ button:disabled {
 .edge-line.path-found {
     stroke: #007bff;
     stroke-width: 3;
+}
+
+.edge-line.cycle {
+    stroke: #ff6b6b;
+    stroke-width: 4;
+    stroke-dasharray: 5, 5;
+    animation: cycle-dash 1s linear infinite;
+}
+
+@keyframes cycle-dash {
+    from {
+        stroke-dashoffset: 10;
+    }
+    to {
+        stroke-dashoffset: 0;
+    }
 }
 
 @keyframes dash {

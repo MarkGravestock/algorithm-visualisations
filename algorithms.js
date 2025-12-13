@@ -536,5 +536,125 @@ const Algorithms = {
 
             return { steps, paths: allPaths };
         }
+    },
+
+    'dfs-cycle-detection': {
+        name: "DFS - Cycle Detection",
+        description: "Depth-first search that detects and avoids cycles in the graph. When a cycle is detected, the algorithm skips that edge and continues exploring other paths.",
+        execute: function(graph, sourceId = null, sinkId = null) {
+            const steps = [];
+            const allPaths = [];
+            const cyclesDetected = [];
+
+            sourceId = sourceId ?? GraphAnalyzer.findSourceNode(graph);
+            sinkId = sinkId ?? GraphAnalyzer.findSinkNode(graph);
+
+            const validation = GraphAnalyzer.validateSourceAndSink(sourceId, sinkId, steps, allPaths);
+            if (!validation.isValid) return validation;
+
+            steps.push(new AlgorithmStep('visit', {
+                nodeId: sourceId,
+                path: [sourceId],
+                action: 'start'
+            }, `Starting DFS with cycle detection from node ${sourceId} to node ${sinkId}`));
+
+            const cycleDetector = {
+                recordSinkReached: (currentPath) => {
+                    steps.push(new AlgorithmStep('visit', {
+                        nodeId: sinkId,
+                        path: currentPath,
+                        action: 'sink-reached'
+                    }, `Reached sink node ${sinkId}`));
+
+                    const pathCopy = [...currentPath];
+                    allPaths.push(pathCopy);
+                    steps.push(new AlgorithmStep('path-found', {
+                        path: pathCopy,
+                        pathIndex: allPaths.length - 1
+                    }, `Found complete path ${allPaths.length}: ${pathCopy.join(' → ')}`));
+                },
+
+                recordExplorationStart: (currentId, currentPath, neighbors) => {
+                    steps.push(new AlgorithmStep('visit', {
+                        nodeId: currentId,
+                        path: [...currentPath],
+                        neighbors: neighbors,
+                        action: 'explore'
+                    }, `Exploring neighbors of node ${currentId}: [${neighbors.join(', ')}]`));
+                },
+
+                recordCycleDetected: (currentId, neighborId, currentPath) => {
+                    const cycleInfo = {
+                        from: currentId,
+                        to: neighborId,
+                        path: [...currentPath]
+                    };
+                    cyclesDetected.push(cycleInfo);
+
+                    steps.push(new AlgorithmStep('cycle-detected', {
+                        from: currentId,
+                        to: neighborId,
+                        path: [...currentPath],
+                        cycleIndex: cyclesDetected.length - 1
+                    }, `🔁 Cycle detected! Edge ${currentId} → ${neighborId} creates a cycle (node ${neighborId} already in current path)`));
+                },
+
+                recordEdgeTraversal: (currentId, neighborId, currentPath) => {
+                    steps.push(new AlgorithmStep('explore-edge', {
+                        from: currentId,
+                        to: neighborId,
+                        path: [...currentPath],
+                        skipped: false
+                    }, `Traversing edge ${currentId} → ${neighborId}`));
+                },
+
+                recordBacktrack: (currentId, currentPath) => {
+                    if (currentId !== sourceId) {
+                        steps.push(new AlgorithmStep('backtrack', {
+                            nodeId: currentId,
+                            path: [...currentPath]
+                        }, `Backtracking from node ${currentId}`));
+                    }
+                },
+
+                exploreFrom: function(currentId, currentPath, visited) {
+                    if (currentId === sinkId) {
+                        this.recordSinkReached(currentPath);
+                        return;
+                    }
+
+                    const neighbors = graph.getNeighbors(currentId);
+                    this.recordExplorationStart(currentId, currentPath, neighbors);
+
+                    for (const neighborId of neighbors) {
+                        if (visited.has(neighborId)) {
+                            this.recordCycleDetected(currentId, neighborId, currentPath);
+                            continue;
+                        }
+
+                        this.recordEdgeTraversal(currentId, neighborId, currentPath);
+
+                        const newPath = [...currentPath, neighborId];
+                        const newVisited = new Set(visited);
+                        newVisited.add(neighborId);
+
+                        this.exploreFrom(neighborId, newPath, newVisited);
+                    }
+
+                    this.recordBacktrack(currentId, currentPath);
+                }
+            };
+
+            const initialVisited = new Set([sourceId]);
+            cycleDetector.exploreFrom(sourceId, [sourceId], initialVisited);
+
+            steps.push(new AlgorithmStep('complete', {
+                totalPaths: allPaths.length,
+                paths: allPaths,
+                cyclesDetected: cyclesDetected.length
+            }, `Search complete! Found ${allPaths.length} path(s) from ${sourceId} to ${sinkId}. Detected ${cyclesDetected.length} cycle(s).`));
+
+            return { steps, paths: allPaths };
+        }
     }
 };

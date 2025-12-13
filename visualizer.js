@@ -455,6 +455,10 @@ class AnimationController {
                 this.renderPathFoundStep(step);
                 break;
 
+            case 'cycle-detected':
+                this.renderCycleDetectedStep(step);
+                break;
+
             case 'complete':
                 break;
         }
@@ -506,6 +510,16 @@ class AnimationController {
     renderPathFoundStep(step) {
         if (step.data.path) {
             this.visualizer.highlightPath(step.data.path, 'path-found');
+        }
+    }
+
+    renderCycleDetectedStep(step) {
+        if (step.data.from !== undefined && step.data.to !== undefined) {
+            this.visualizer.highlightEdge(step.data.from, step.data.to, 'cycle');
+            this.visualizer.highlightNode(step.data.to, 'cycle');
+        }
+        if (step.data.path) {
+            this.highlightCurrentPath(step.data.path);
         }
     }
 

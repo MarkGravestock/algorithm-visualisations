@@ -339,5 +339,61 @@ const Examples = {
 
             return builder.build();
         }
+    },
+
+    'with-cycles': {
+        name: "Graph with Cycles (12 nodes)",
+        description: "A directed graph containing cycles to demonstrate cycle detection during path finding",
+        createGraph: function() {
+            const builder = new GraphBuilder();
+
+            builder.addLayerOfNodes([
+                { id: 0, label: "S", x: 150, y: 50 }
+            ]);
+
+            builder.addLayerOfNodes([
+                { id: 1, label: "A", x: 80, y: 140 },
+                { id: 5, label: "E", x: 150, y: 140 },
+                { id: 8, label: "H", x: 220, y: 140 }
+            ]);
+
+            builder.addLayerOfNodes([
+                { id: 2, label: "B", x: 50, y: 230 },
+                { id: 3, label: "C", x: 110, y: 230 },
+                { id: 6, label: "F", x: 180, y: 230 },
+                { id: 9, label: "I", x: 250, y: 230 }
+            ]);
+
+            builder.addLayerOfNodes([
+                { id: 4, label: "D", x: 80, y: 320 },
+                { id: 7, label: "G", x: 180, y: 320 },
+                { id: 10, label: "J", x: 250, y: 320 }
+            ]);
+
+            builder.addLayerOfNodes([
+                { id: 11, label: "T", x: 150, y: 410 }
+            ]);
+
+            builder.graph.addEdge(0, 1);
+            builder.graph.addEdge(0, 5);
+            builder.graph.addEdge(0, 8);
+
+            builder.graph.addEdge(1, 2);
+            builder.graph.addEdge(2, 3);
+            builder.graph.addEdge(3, 4);
+            builder.graph.addEdge(3, 1);
+            builder.graph.addEdge(4, 11);
+
+            builder.graph.addEdge(5, 6);
+            builder.graph.addEdge(6, 7);
+            builder.graph.addEdge(7, 5);
+            builder.graph.addEdge(7, 11);
+
+            builder.graph.addEdge(8, 9);
+            builder.graph.addEdge(9, 10);
+            builder.graph.addEdge(10, 11);
+
+            return builder.build();
+        }
     }
 };
