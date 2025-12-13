@@ -298,7 +298,7 @@ const Algorithms = {
             }, `Starting memoized DFS from node ${sourceId} to find all paths to node ${sinkId}`));
 
             // Recursive DFS with memoization
-            function dfs(currentId, currentPath) {
+            function dfs(currentId, currentPath, usedCache) {
                 // Check if we reached the sink
                 if (currentId === sinkId) {
                     steps.push(new AlgorithmStep('visit', {
@@ -306,6 +306,16 @@ const Algorithms = {
                         path: currentPath,
                         action: 'sink-reached'
                     }, `Reached sink node ${sinkId}`));
+
+                    // If we're completing a path from source to sink, record it
+                    if (currentPath.length > 0) {
+                        allPaths.push([...currentPath]);
+                        steps.push(new AlgorithmStep('path-found', {
+                            path: [...currentPath],
+                            pathIndex: allPaths.length - 1,
+                            fromCache: usedCache
+                        }, `Found complete path ${allPaths.length}: ${currentPath.join(' → ')}${usedCache ? ' (via cache)' : ''}`));
+                    }
 
                     return [[sinkId]];
                 }
@@ -320,6 +330,19 @@ const Algorithms = {
                         action: 'cache-hit',
                         cachedPathCount: cachedPaths.length
                     }, `Cache hit! Node ${currentId} has ${cachedPaths.length} cached path(s) to sink - reusing results`));
+
+                    // If we're at a point where we can construct complete paths, emit them
+                    if (currentPath.length > 0) {
+                        for (const cachedPath of cachedPaths) {
+                            const completePath = [...currentPath.slice(0, -1), ...cachedPath];
+                            allPaths.push(completePath);
+                            steps.push(new AlgorithmStep('path-found', {
+                                path: completePath,
+                                pathIndex: allPaths.length - 1,
+                                fromCache: true
+                            }, `Found complete path ${allPaths.length}: ${completePath.join(' → ')} (via cache)`));
+                        }
+                    }
 
                     // Return cached paths (they already include currentId)
                     return cachedPaths;
@@ -345,7 +368,7 @@ const Algorithms = {
                     }, `Traversing edge ${currentId} → ${neighborId}`));
 
                     const newPath = [...currentPath, neighborId];
-                    const pathsFromNeighbor = dfs(neighborId, newPath);
+                    const pathsFromNeighbor = dfs(neighborId, newPath, usedCache);
 
                     // Combine paths: currentId + each path from neighbor
                     for (const pathFromNeighbor of pathsFromNeighbor) {
@@ -366,17 +389,8 @@ const Algorithms = {
                 return pathsFromHere;
             }
 
-            // Start DFS and collect all paths
-            const pathsFromSource = dfs(sourceId, [sourceId]);
-
-            // Add found paths to the results
-            pathsFromSource.forEach((path, index) => {
-                allPaths.push(path);
-                steps.push(new AlgorithmStep('path-found', {
-                    path: path,
-                    pathIndex: index
-                }, `Path ${index + 1}: ${path.join(' → ')}`));
-            });
+            // Start DFS
+            dfs(sourceId, [sourceId], false);
 
             steps.push(new AlgorithmStep('complete', {
                 totalPaths: allPaths.length,

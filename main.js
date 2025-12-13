@@ -228,22 +228,22 @@ class AlgorithmVisualizerApp {
         this.elements.pathsFound.textContent = pathsFoundSoFar;
 
         if (step.type === 'path-found') {
-            this.addPathToList(step.data.path, step.data.pathIndex);
+            this.addPathToList(step.data.path, step.data.pathIndex, step.data.fromCache);
         }
 
         // Scroll step description into view
         this.elements.stepDescription.scrollTop = this.elements.stepDescription.scrollHeight;
     }
 
-    addPathToList(path, index) {
+    addPathToList(path, index, fromCache = false) {
         if (this.elements.pathsContent.querySelector('p')) {
             this.elements.pathsContent.innerHTML = '';
         }
 
         const pathDiv = document.createElement('div');
-        pathDiv.className = 'path-item';
+        pathDiv.className = fromCache ? 'path-item from-cache' : 'path-item';
         pathDiv.innerHTML = `
-            <strong>Path ${index + 1}:</strong><br>
+            <strong>Path ${index + 1}:</strong>${fromCache ? '<span class="cache-badge">CACHED</span>' : ''}<br>
             ${path.join(' → ')}
         `;
 
