@@ -224,6 +224,23 @@ button:disabled {
     font-size: 13px;
 }
 
+.path-item.from-cache {
+    background: #d1f0f5;
+    border-left: 4px solid #17a2b8;
+}
+
+.path-item .cache-badge {
+    display: inline-block;
+    background: #17a2b8;
+    color: white;
+    padding: 2px 6px;
+    border-radius: 3px;
+    font-size: 10px;
+    font-weight: bold;
+    margin-left: 8px;
+    vertical-align: middle;
+}
+
 #step-description {
     color: #6c757d;
     line-height: 1.6;
