@@ -192,22 +192,45 @@ class AlgorithmVisualizerApp {
 
     updateStepInfo(step, stepIndex) {
         if (!step) {
-            this.elements.stepDescription.innerHTML = '<p style="color: #6c757d;">Click Start to begin visualization</p>';
+            this.showInitialMessage();
             return;
         }
 
-        // Update step description
+        this.displayStepDescription(step, stepIndex);
+        this.updateCurrentPathDisplay(step);
+        this.updateNodesVisitedCount(stepIndex);
+        this.updateFoundPathsCount(stepIndex);
+
+        if (step.type === 'path-found') {
+            this.addPathToList(step.data.path, step.data.pathIndex, step.data.fromCache);
+        }
+
+        this.scrollStepDescriptionToBottom();
+    }
+
+    showInitialMessage() {
+        this.elements.stepDescription.innerHTML = '<p style="color: #6c757d;">Click Start to begin visualization</p>';
+    }
+
+    displayStepDescription(step, stepIndex) {
         this.elements.stepDescription.innerHTML = `
             <p><strong>Step ${stepIndex + 1}/${this.algorithmSteps.length}</strong></p>
             <p>${step.description}</p>
         `;
+    }
 
-        // Update current path
+    updateCurrentPathDisplay(step) {
         if (step.data.path) {
             this.elements.currentPath.textContent = `[${step.data.path.join(' → ')}]`;
         }
+    }
 
-        // Update nodes visited count
+    updateNodesVisitedCount(stepIndex) {
+        const visitedNodes = this.collectVisitedNodes(stepIndex);
+        this.elements.nodesVisited.textContent = visitedNodes.size;
+    }
+
+    collectVisitedNodes(stepIndex) {
         const visitedNodes = new Set();
         for (let i = 0; i <= stepIndex; i++) {
             const s = this.algorithmSteps[i];
@@ -218,20 +241,21 @@ class AlgorithmVisualizerApp {
                 s.data.path.forEach(id => visitedNodes.add(id));
             }
         }
-        this.elements.nodesVisited.textContent = visitedNodes.size;
+        return visitedNodes;
+    }
 
-        // Update found paths
-        const pathsFoundSoFar = this.algorithmSteps
+    updateFoundPathsCount(stepIndex) {
+        const pathsFoundSoFar = this.countPathsFoundUpToStep(stepIndex);
+        this.elements.pathsFound.textContent = pathsFoundSoFar;
+    }
+
+    countPathsFoundUpToStep(stepIndex) {
+        return this.algorithmSteps
             .slice(0, stepIndex + 1)
             .filter(s => s.type === 'path-found').length;
+    }
 
-        this.elements.pathsFound.textContent = pathsFoundSoFar;
-
-        if (step.type === 'path-found') {
-            this.addPathToList(step.data.path, step.data.pathIndex, step.data.fromCache);
-        }
-
-        // Scroll step description into view
+    scrollStepDescriptionToBottom() {
         this.elements.stepDescription.scrollTop = this.elements.stepDescription.scrollHeight;
     }
 
@@ -252,12 +276,18 @@ class AlgorithmVisualizerApp {
     }
 
     onAnimationComplete() {
+        this.resetButtonStates();
+        this.displayCompletionMessage();
+    }
+
+    resetButtonStates() {
         this.elements.startBtn.disabled = false;
         this.elements.pauseBtn.disabled = true;
         this.elements.stepBtn.disabled = false;
         this.elements.pauseBtn.textContent = 'Pause';
+    }
 
-        // Show completion message
+    displayCompletionMessage() {
         const completionStep = this.algorithmSteps[this.algorithmSteps.length - 1];
         if (completionStep && completionStep.type === 'complete') {
             this.elements.stepDescription.innerHTML = `
@@ -268,7 +298,8 @@ class AlgorithmVisualizerApp {
     }
 }
 
-// Initialize the application when DOM is loaded
-document.addEventListener('DOMContentLoaded', () => {
+function initializeApplicationWhenReady() {
     window.app = new AlgorithmVisualizerApp();
-});
+}
+
+document.addEventListener('DOMContentLoaded', initializeApplicationWhenReady);

@@ -13,7 +13,11 @@ class GraphVisualizer {
     }
 
     setupSVG() {
-        // Create arrow marker for directed edges
+        this.createArrowMarker();
+        this.createRenderingGroups();
+    }
+
+    createArrowMarker() {
         const defs = document.createElementNS('http://www.w3.org/2000/svg', 'defs');
         const marker = document.createElementNS('http://www.w3.org/2000/svg', 'marker');
         marker.setAttribute('id', 'arrowhead');
@@ -31,8 +35,9 @@ class GraphVisualizer {
         marker.appendChild(polygon);
         defs.appendChild(marker);
         this.svg.appendChild(defs);
+    }
 
-        // Create groups for edges and nodes (edges should be drawn first)
+    createRenderingGroups() {
         this.edgesGroup = document.createElementNS('http://www.w3.org/2000/svg', 'g');
         this.edgesGroup.setAttribute('class', 'edges');
         this.svg.appendChild(this.edgesGroup);
@@ -49,18 +54,24 @@ class GraphVisualizer {
     }
 
     render() {
-        // Clear existing elements
+        this.clearExistingElements();
+        if (!this.graph) return;
+        this.renderEdges();
+        this.renderNodes();
+    }
+
+    clearExistingElements() {
         this.edgesGroup.innerHTML = '';
         this.nodesGroup.innerHTML = '';
+    }
 
-        if (!this.graph) return;
-
-        // Draw edges
+    renderEdges() {
         this.graph.edges.forEach(edge => {
             this.drawEdge(edge);
         });
+    }
 
-        // Draw nodes
+    renderNodes() {
         this.graph.nodes.forEach(node => {
             this.drawNode(node);
         });
@@ -72,51 +83,81 @@ class GraphVisualizer {
 
         if (!fromNode || !toNode) return;
 
-        // Calculate edge endpoints (from circle edge to circle edge)
+        const endpoints = this.calculateEdgeEndpoints(fromNode, toNode);
+        if (!endpoints) return;
+
+        const line = this.createEdgeLine(edge, endpoints);
+        this.edgesGroup.appendChild(line);
+    }
+
+    calculateEdgeEndpoints(fromNode, toNode) {
         const dx = toNode.x - fromNode.x;
         const dy = toNode.y - fromNode.y;
         const distance = Math.sqrt(dx * dx + dy * dy);
 
-        if (distance === 0) return;
+        if (distance === 0) return null;
 
         const unitX = dx / distance;
         const unitY = dy / distance;
 
-        const startX = fromNode.x + unitX * this.nodeRadius;
-        const startY = fromNode.y + unitY * this.nodeRadius;
-        const endX = toNode.x - unitX * (this.nodeRadius + 10);
-        const endY = toNode.y - unitY * (this.nodeRadius + 10);
+        return {
+            startX: fromNode.x + unitX * this.nodeRadius,
+            startY: fromNode.y + unitY * this.nodeRadius,
+            endX: toNode.x - unitX * (this.nodeRadius + 10),
+            endY: toNode.y - unitY * (this.nodeRadius + 10)
+        };
+    }
 
+    createEdgeLine(edge, endpoints) {
         const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
         line.setAttribute('class', 'edge-line');
-        line.setAttribute('x1', startX);
-        line.setAttribute('y1', startY);
-        line.setAttribute('x2', endX);
-        line.setAttribute('y2', endY);
+        line.setAttribute('x1', endpoints.startX);
+        line.setAttribute('y1', endpoints.startY);
+        line.setAttribute('x2', endpoints.endX);
+        line.setAttribute('y2', endpoints.endY);
         line.setAttribute('data-from', edge.from);
         line.setAttribute('data-to', edge.to);
-
-        this.edgesGroup.appendChild(line);
+        return line;
     }
 
     drawNode(node) {
+        const group = this.createNodeGroup(node);
+        const circle = this.createNodeCircle();
+        const text = this.createNodeLabel(node);
+        const badgeGroup = this.createVisitCountBadge();
+
+        group.appendChild(circle);
+        group.appendChild(text);
+        group.appendChild(badgeGroup);
+        this.nodesGroup.appendChild(group);
+    }
+
+    createNodeGroup(node) {
         const group = document.createElementNS('http://www.w3.org/2000/svg', 'g');
         group.setAttribute('transform', `translate(${node.x}, ${node.y})`);
         group.setAttribute('data-node-id', node.id);
+        return group;
+    }
 
+    createNodeCircle() {
         const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
         circle.setAttribute('class', 'node-circle');
         circle.setAttribute('r', this.nodeRadius);
         circle.setAttribute('cx', 0);
         circle.setAttribute('cy', 0);
+        return circle;
+    }
 
+    createNodeLabel(node) {
         const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
         text.setAttribute('class', 'node-label');
         text.setAttribute('x', 0);
         text.setAttribute('y', 5);
         text.textContent = node.label;
+        return text;
+    }
 
-        // Create visit count badge (initially hidden)
+    createVisitCountBadge() {
         const badgeGroup = document.createElementNS('http://www.w3.org/2000/svg', 'g');
         badgeGroup.setAttribute('class', 'visit-badge');
         badgeGroup.setAttribute('data-visit-count', '0');
@@ -136,22 +177,26 @@ class GraphVisualizer {
 
         badgeGroup.appendChild(badgeCircle);
         badgeGroup.appendChild(badgeText);
-
-        group.appendChild(circle);
-        group.appendChild(text);
-        group.appendChild(badgeGroup);
-        this.nodesGroup.appendChild(group);
+        return badgeGroup;
     }
 
     centerGraph() {
         if (!this.graph || this.graph.nodes.length === 0) return;
 
         const svgRect = this.svg.getBoundingClientRect();
-        const svgWidth = svgRect.width;
-        const svgHeight = svgRect.height;
+        const bounds = this.calculateGraphBounds();
+        this.scale = this.calculateFitScale(svgRect, bounds);
+        const offsets = this.calculateCenteringOffsets(svgRect, bounds);
 
-        // Calculate bounding box of graph
+        this.offsetX = offsets.x;
+        this.offsetY = offsets.y;
+
+        this.applyGraphTransformation();
+    }
+
+    calculateGraphBounds() {
         let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+
         this.graph.nodes.forEach(node => {
             minX = Math.min(minX, node.x);
             minY = Math.min(minY, node.y);
@@ -162,18 +207,26 @@ class GraphVisualizer {
         const graphWidth = maxX - minX + 2 * this.nodeRadius;
         const graphHeight = maxY - minY + 2 * this.nodeRadius;
 
-        // Calculate scale to fit
-        const scaleX = (svgWidth - 100) / graphWidth;
-        const scaleY = (svgHeight - 100) / graphHeight;
-        this.scale = Math.min(scaleX, scaleY, 1.2);
+        return { minX, minY, maxX, maxY, graphWidth, graphHeight };
+    }
 
-        // Calculate offset to center
-        const graphCenterX = (minX + maxX) / 2;
-        const graphCenterY = (minY + maxY) / 2;
-        this.offsetX = svgWidth / 2 - graphCenterX * this.scale;
-        this.offsetY = svgHeight / 2 - graphCenterY * this.scale;
+    calculateFitScale(svgRect, bounds) {
+        const scaleX = (svgRect.width - 100) / bounds.graphWidth;
+        const scaleY = (svgRect.height - 100) / bounds.graphHeight;
+        return Math.min(scaleX, scaleY, 1.2);
+    }
 
-        // Apply transformation
+    calculateCenteringOffsets(svgRect, bounds) {
+        const graphCenterX = (bounds.minX + bounds.maxX) / 2;
+        const graphCenterY = (bounds.minY + bounds.maxY) / 2;
+
+        return {
+            x: svgRect.width / 2 - graphCenterX * this.scale,
+            y: svgRect.height / 2 - graphCenterY * this.scale
+        };
+    }
+
+    applyGraphTransformation() {
         const transform = `translate(${this.offsetX}, ${this.offsetY}) scale(${this.scale})`;
         this.edgesGroup.setAttribute('transform', transform);
         this.nodesGroup.setAttribute('transform', transform);
@@ -222,24 +275,34 @@ class GraphVisualizer {
     }
 
     resetHighlights() {
-        // Reset all nodes
+        this.resetAllNodeHighlights();
+        this.resetAllEdgeHighlights();
+    }
+
+    resetAllNodeHighlights() {
         this.nodesGroup.querySelectorAll('.node-circle').forEach(circle => {
             circle.setAttribute('class', 'node-circle');
         });
+    }
 
-        // Reset all edges
+    resetAllEdgeHighlights() {
         this.edgesGroup.querySelectorAll('.edge-line').forEach(edge => {
             edge.setAttribute('class', 'edge-line');
         });
     }
 
     highlightPath(path, className) {
-        // Highlight nodes in path
+        this.highlightNodesInPath(path, className);
+        this.highlightEdgesInPath(path, className);
+    }
+
+    highlightNodesInPath(path, className) {
         path.forEach(nodeId => {
             this.highlightNode(nodeId, className);
         });
+    }
 
-        // Highlight edges in path
+    highlightEdgesInPath(path, className) {
         for (let i = 0; i < path.length - 1; i++) {
             this.highlightEdge(path[i], path[i + 1], className);
         }
@@ -356,80 +419,107 @@ class AnimationController {
         const step = this.steps[stepIndex];
         if (!step) return;
 
-        // Reset highlights before each step
         this.visualizer.resetHighlights();
+        this.updateVisitCountIfNeeded(step);
+        this.renderStepVisualization(step);
 
-        // Increment visit count for visited nodes (exclude initial 'start' action)
+        if (this.onStepChange) {
+            this.onStepChange(step, stepIndex);
+        }
+    }
+
+    updateVisitCountIfNeeded(step) {
         if (step.type === 'visit' && step.data.nodeId !== undefined && step.data.action !== 'start') {
             const currentCount = this.visitCounts.get(step.data.nodeId) || 0;
             const newCount = currentCount + 1;
             this.visitCounts.set(step.data.nodeId, newCount);
             this.visualizer.updateVisitCount(step.data.nodeId, newCount);
         }
+    }
 
+    renderStepVisualization(step) {
         switch (step.type) {
             case 'visit':
-                if (step.data.nodeId !== undefined) {
-                    // Special highlighting for cache hits
-                    const nodeClass = step.data.action === 'cache-hit' ? 'cache-hit' : 'current';
-                    this.visualizer.highlightNode(step.data.nodeId, nodeClass);
-                }
-                if (step.data.path) {
-                    step.data.path.forEach((nodeId, idx) => {
-                        if (idx < step.data.path.length - 1) {
-                            this.visualizer.highlightNode(nodeId, 'in-path');
-                        }
-                    });
-                    for (let i = 0; i < step.data.path.length - 1; i++) {
-                        this.visualizer.highlightEdge(
-                            step.data.path[i],
-                            step.data.path[i + 1],
-                            'in-path'
-                        );
-                    }
-                }
+                this.renderVisitStep(step);
                 break;
 
             case 'explore-edge':
-                if (!step.data.skipped) {
-                    this.visualizer.highlightEdge(step.data.from, step.data.to, 'active');
-                    this.visualizer.highlightNode(step.data.to, 'visiting');
-                }
-                if (step.data.path) {
-                    step.data.path.forEach(nodeId => {
-                        this.visualizer.highlightNode(nodeId, 'in-path');
-                    });
-                    for (let i = 0; i < step.data.path.length - 1; i++) {
-                        this.visualizer.highlightEdge(
-                            step.data.path[i],
-                            step.data.path[i + 1],
-                            'in-path'
-                        );
-                    }
-                }
+                this.renderExploreEdgeStep(step);
                 break;
 
             case 'backtrack':
-                if (step.data.path) {
-                    step.data.path.forEach(nodeId => {
-                        this.visualizer.highlightNode(nodeId, 'visited');
-                    });
-                }
+                this.renderBacktrackStep(step);
                 break;
 
             case 'path-found':
-                if (step.data.path) {
-                    this.visualizer.highlightPath(step.data.path, 'path-found');
-                }
+                this.renderPathFoundStep(step);
+                break;
+
+            case 'cycle-detected':
+                this.renderCycleDetectedStep(step);
                 break;
 
             case 'complete':
-                // Keep the last state
                 break;
         }
+    }
 
-        if (this.onStepChange) {
-            this.onStepChange(step, stepIndex);
+    renderVisitStep(step) {
+        if (step.data.nodeId !== undefined) {
+            const nodeClass = this.determineNodeHighlightClass(step);
+            this.visualizer.highlightNode(step.data.nodeId, nodeClass);
+        }
+        if (step.data.path) {
+            this.highlightCurrentPath(step.data.path);
+        }
+    }
+
+    determineNodeHighlightClass(step) {
+        return step.data.action === 'cache-hit' ? 'cache-hit' : 'current';
+    }
+
+    highlightCurrentPath(path) {
+        path.forEach((nodeId, idx) => {
+            if (idx < path.length - 1) {
+                this.visualizer.highlightNode(nodeId, 'in-path');
+            }
+        });
+        for (let i = 0; i < path.length - 1; i++) {
+            this.visualizer.highlightEdge(path[i], path[i + 1], 'in-path');
+        }
+    }
+
+    renderExploreEdgeStep(step) {
+        if (!step.data.skipped) {
+            this.visualizer.highlightEdge(step.data.from, step.data.to, 'active');
+            this.visualizer.highlightNode(step.data.to, 'visiting');
+        }
+        if (step.data.path) {
+            this.highlightCurrentPath(step.data.path);
+        }
+    }
+
+    renderBacktrackStep(step) {
+        if (step.data.path) {
+            step.data.path.forEach(nodeId => {
+                this.visualizer.highlightNode(nodeId, 'visited');
+            });
+        }
+    }
+
+    renderPathFoundStep(step) {
+        if (step.data.path) {
+            this.visualizer.highlightPath(step.data.path, 'path-found');
+        }
+    }
+
+    renderCycleDetectedStep(step) {
+        if (step.data.from !== undefined && step.data.to !== undefined) {
+            this.visualizer.highlightEdge(step.data.from, step.data.to, 'cycle');
+            this.visualizer.highlightNode(step.data.to, 'cycle');
+        }
+        if (step.data.path) {
+            this.highlightCurrentPath(step.data.path);
         }
     }
 
