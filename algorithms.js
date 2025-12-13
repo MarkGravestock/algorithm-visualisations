@@ -249,6 +249,131 @@ const Algorithms = {
 
             return { steps, paths: allPaths };
         }
+    },
+
+    'dfs-memoized': {
+        name: "DFS - All Paths (Memoized)",
+        description: "Optimized DFS using memoization to cache path results. Once all paths from a node to sink are computed, they're reused on subsequent visits. Finds the same paths as standard DFS but more efficiently.",
+
+        execute: function(graph, sourceId = null, sinkId = null) {
+            const steps = [];
+            const allPaths = [];
+            const memo = new Map(); // Cache: nodeId -> array of paths from that node to sink
+
+            // Auto-detect source and sink if not provided
+            if (sourceId === null) {
+                const nodesWithIncoming = new Set();
+                graph.edges.forEach(edge => nodesWithIncoming.add(edge.to));
+                sourceId = graph.nodes.find(n => !nodesWithIncoming.has(n.id))?.id;
+            }
+
+            if (sinkId === null) {
+                sinkId = graph.nodes.find(n =>
+                    graph.getNeighbors(n.id).length === 0
+                )?.id;
+            }
+
+            if (sourceId === undefined || sinkId === undefined) {
+                steps.push(new AlgorithmStep('complete', {},
+                    'Error: Could not identify source or sink node'));
+                return { steps, paths: allPaths };
+            }
+
+            steps.push(new AlgorithmStep('visit', {
+                nodeId: sourceId,
+                path: [sourceId],
+                action: 'start'
+            }, `Starting memoized DFS from node ${sourceId} to find all paths to node ${sinkId}`));
+
+            // Recursive DFS with memoization
+            function dfs(currentId, currentPath) {
+                // Check if we reached the sink
+                if (currentId === sinkId) {
+                    steps.push(new AlgorithmStep('visit', {
+                        nodeId: currentId,
+                        path: currentPath,
+                        action: 'sink-reached'
+                    }, `Reached sink node ${sinkId}`));
+
+                    return [[sinkId]];
+                }
+
+                // Check memo cache
+                if (memo.has(currentId)) {
+                    const cachedPaths = memo.get(currentId);
+
+                    steps.push(new AlgorithmStep('visit', {
+                        nodeId: currentId,
+                        path: currentPath,
+                        action: 'cache-hit',
+                        cachedPathCount: cachedPaths.length
+                    }, `Cache hit! Node ${currentId} has ${cachedPaths.length} cached path(s) to sink - reusing results`));
+
+                    // Return cached paths (they already include currentId)
+                    return cachedPaths;
+                }
+
+                // Cache miss - need to compute
+                steps.push(new AlgorithmStep('visit', {
+                    nodeId: currentId,
+                    path: currentPath,
+                    action: 'explore'
+                }, `Cache miss - exploring neighbors of node ${currentId}`));
+
+                const neighbors = graph.getNeighbors(currentId);
+                const pathsFromHere = [];
+
+                // Explore each neighbor
+                for (const neighborId of neighbors) {
+                    steps.push(new AlgorithmStep('explore-edge', {
+                        from: currentId,
+                        to: neighborId,
+                        path: currentPath,
+                        skipped: false
+                    }, `Traversing edge ${currentId} → ${neighborId}`));
+
+                    const newPath = [...currentPath, neighborId];
+                    const pathsFromNeighbor = dfs(neighborId, newPath);
+
+                    // Combine paths: currentId + each path from neighbor
+                    for (const pathFromNeighbor of pathsFromNeighbor) {
+                        const fullPath = [currentId, ...pathFromNeighbor];
+                        pathsFromHere.push(fullPath);
+                    }
+                }
+
+                // Cache the results
+                memo.set(currentId, pathsFromHere);
+
+                steps.push(new AlgorithmStep('backtrack', {
+                    nodeId: currentId,
+                    path: currentPath,
+                    cachedCount: pathsFromHere.length
+                }, `Cached ${pathsFromHere.length} path(s) from node ${currentId} to sink`));
+
+                return pathsFromHere;
+            }
+
+            // Start DFS and collect all paths
+            const pathsFromSource = dfs(sourceId, [sourceId]);
+
+            // Add found paths to the results
+            pathsFromSource.forEach((path, index) => {
+                allPaths.push(path);
+                steps.push(new AlgorithmStep('path-found', {
+                    path: path,
+                    pathIndex: index
+                }, `Path ${index + 1}: ${path.join(' → ')}`));
+            });
+
+            steps.push(new AlgorithmStep('complete', {
+                totalPaths: allPaths.length,
+                paths: allPaths,
+                cacheSize: memo.size
+            }, `Search complete! Found ${allPaths.length} path(s) using memoization. Cache contains ${memo.size} entries.`));
+
+            return { steps, paths: allPaths };
+        }
     }
 };
 
