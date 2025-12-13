@@ -499,6 +499,12 @@ class AnimationController {
         } else if (step.data.reason === 'globally-used') {
             this.visualizer.highlightEdge(step.data.from, step.data.to, 'skipped');
             this.visualizer.highlightNode(step.data.to, 'skipped');
+        } else if (step.data.reason === 'max-depth' || step.data.reason === 'limit-reached') {
+            // Show warning state for depth/limit reached
+            if (step.data.from && step.data.to) {
+                this.visualizer.highlightEdge(step.data.from, step.data.to, 'warning');
+                this.visualizer.highlightNode(step.data.to, 'warning');
+            }
         }
         if (step.data.path) {
             this.highlightCurrentPath(step.data.path);

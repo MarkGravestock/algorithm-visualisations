@@ -74,28 +74,28 @@ const Examples = {
             const builder = new GraphBuilder();
 
             builder.addLayerOfNodes([
-                { id: 0, label: "0", x: 100, y: 100 }
+                { id: 0, label: "0", x: 150, y: 80 }
             ]);
 
             builder.addLayerOfNodes([
-                { id: 1, label: "1", x: 50, y: 200 },
-                { id: 2, label: "2", x: 150, y: 200 }
+                { id: 1, label: "1", x: 80, y: 230 },
+                { id: 2, label: "2", x: 220, y: 230 }
             ]);
 
             builder.addLayerOfNodes([
-                { id: 3, label: "3", x: 30, y: 300 },
-                { id: 4, label: "4", x: 100, y: 300 },
-                { id: 5, label: "5", x: 170, y: 300 }
+                { id: 3, label: "3", x: 40, y: 380 },
+                { id: 4, label: "4", x: 150, y: 380 },
+                { id: 5, label: "5", x: 260, y: 380 }
             ]);
 
             builder.addLayerOfNodes([
-                { id: 6, label: "6", x: 50, y: 400 },
-                { id: 7, label: "7", x: 120, y: 400 },
-                { id: 8, label: "8", x: 190, y: 400 }
+                { id: 6, label: "6", x: 70, y: 530 },
+                { id: 7, label: "7", x: 150, y: 530 },
+                { id: 8, label: "8", x: 230, y: 530 }
             ]);
 
             builder.addLayerOfNodes([
-                { id: 9, label: "9", x: 120, y: 500 }
+                { id: 9, label: "9", x: 150, y: 680 }
             ]);
 
             builder.connectOneToMany(0, [1, 2]);
@@ -348,30 +348,30 @@ const Examples = {
             const builder = new GraphBuilder();
 
             builder.addLayerOfNodes([
-                { id: 0, label: "S", x: 250, y: 50 }
+                { id: 0, label: "S", x: 300, y: 60 }
             ]);
 
             builder.addLayerOfNodes([
-                { id: 1, label: "A", x: 100, y: 160 },
-                { id: 5, label: "E", x: 250, y: 160 },
-                { id: 8, label: "H", x: 400, y: 160 }
+                { id: 1, label: "A", x: 120, y: 220 },
+                { id: 5, label: "E", x: 300, y: 220 },
+                { id: 8, label: "H", x: 480, y: 220 }
             ]);
 
             builder.addLayerOfNodes([
-                { id: 2, label: "B", x: 60, y: 280 },
-                { id: 3, label: "C", x: 140, y: 280 },
-                { id: 6, label: "F", x: 250, y: 280 },
-                { id: 9, label: "I", x: 400, y: 280 }
+                { id: 2, label: "B", x: 70, y: 380 },
+                { id: 3, label: "C", x: 170, y: 380 },
+                { id: 6, label: "F", x: 300, y: 380 },
+                { id: 9, label: "I", x: 480, y: 380 }
             ]);
 
             builder.addLayerOfNodes([
-                { id: 4, label: "D", x: 100, y: 400 },
-                { id: 7, label: "G", x: 250, y: 400 },
-                { id: 10, label: "J", x: 400, y: 400 }
+                { id: 4, label: "D", x: 120, y: 540 },
+                { id: 7, label: "G", x: 300, y: 540 },
+                { id: 10, label: "J", x: 480, y: 540 }
             ]);
 
             builder.addLayerOfNodes([
-                { id: 11, label: "T", x: 250, y: 520 }
+                { id: 11, label: "T", x: 300, y: 700 }
             ]);
 
             builder.graph.addEdge(0, 1);
