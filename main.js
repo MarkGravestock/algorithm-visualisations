@@ -112,9 +112,9 @@ class AlgorithmVisualizerApp {
     updateSpeed() {
         const speedValue = this.elements.speedSelect.value;
         const speedMap = {
-            'slow': 2000,
-            'medium': 1000,
-            'fast': 500
+            'slow': 1500,
+            'medium': 750,
+            'fast': 200
         };
 
         this.animator.setSpeed(speedMap[speedValue] || 1000);
