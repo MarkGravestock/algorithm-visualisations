@@ -370,7 +370,9 @@ class AnimationController {
         switch (step.type) {
             case 'visit':
                 if (step.data.nodeId !== undefined) {
-                    this.visualizer.highlightNode(step.data.nodeId, 'current');
+                    // Special highlighting for cache hits
+                    const nodeClass = step.data.action === 'cache-hit' ? 'cache-hit' : 'current';
+                    this.visualizer.highlightNode(step.data.nodeId, nodeClass);
                 }
                 if (step.data.path) {
                     step.data.path.forEach((nodeId, idx) => {
