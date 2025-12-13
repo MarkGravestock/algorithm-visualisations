@@ -48,6 +48,12 @@ const Algorithms = {
             function dfs(currentId, currentPath, visited) {
                 // Check if we reached the sink
                 if (currentId === sinkId) {
+                    steps.push(new AlgorithmStep('visit', {
+                        nodeId: currentId,
+                        path: currentPath,
+                        action: 'sink-reached'
+                    }, `Reached sink node ${sinkId}`));
+
                     const pathCopy = [...currentPath];
                     allPaths.push(pathCopy);
 
@@ -162,6 +168,12 @@ const Algorithms = {
             function dfs(currentId, currentPath, visited) {
                 // Check if we reached the sink
                 if (currentId === sinkId) {
+                    steps.push(new AlgorithmStep('visit', {
+                        nodeId: currentId,
+                        path: currentPath,
+                        action: 'sink-reached'
+                    }, `Reached sink node ${sinkId}`));
+
                     const pathCopy = [...currentPath];
                     allPaths.push(pathCopy);
 

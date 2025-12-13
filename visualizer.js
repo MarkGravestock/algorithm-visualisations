@@ -359,8 +359,8 @@ class AnimationController {
         // Reset highlights before each step
         this.visualizer.resetHighlights();
 
-        // Increment visit count for visited nodes
-        if (step.type === 'visit' && step.data.nodeId !== undefined) {
+        // Increment visit count for visited nodes (exclude initial 'start' action)
+        if (step.type === 'visit' && step.data.nodeId !== undefined && step.data.action !== 'start') {
             const currentCount = this.visitCounts.get(step.data.nodeId) || 0;
             const newCount = currentCount + 1;
             this.visitCounts.set(step.data.nodeId, newCount);
