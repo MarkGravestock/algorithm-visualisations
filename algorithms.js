@@ -400,11 +400,134 @@ const Algorithms = {
 
             return { steps, paths: allPaths };
         }
+    },
+
+    'bfs-all-paths': {
+        name: "BFS - All Paths",
+        description: "Breadth-First Search to find all possible paths from source to sink. Explores paths level-by-level, finding shorter paths before longer ones. Uses a queue-based approach instead of recursion.",
+
+        execute: function(graph, sourceId = null, sinkId = null) {
+            const steps = [];
+            const allPaths = [];
+
+            // Auto-detect source and sink if not provided
+            if (sourceId === null) {
+                const nodesWithIncoming = new Set();
+                graph.edges.forEach(edge => nodesWithIncoming.add(edge.to));
+                sourceId = graph.nodes.find(n => !nodesWithIncoming.has(n.id))?.id;
+            }
+
+            if (sinkId === null) {
+                sinkId = graph.nodes.find(n =>
+                    graph.getNeighbors(n.id).length === 0
+                )?.id;
+            }
+
+            if (sourceId === undefined || sinkId === undefined) {
+                steps.push(new AlgorithmStep('complete', {},
+                    'Error: Could not identify source or sink node'));
+                return { steps, paths: allPaths };
+            }
+
+            steps.push(new AlgorithmStep('visit', {
+                nodeId: sourceId,
+                path: [sourceId],
+                action: 'start'
+            }, `Starting BFS from node ${sourceId} to find all paths to node ${sinkId}`));
+
+            // BFS using a queue - each item is a path
+            const queue = [[sourceId]];
+
+            steps.push(new AlgorithmStep('visit', {
+                nodeId: sourceId,
+                path: [sourceId],
+                action: 'enqueue'
+            }, `Enqueued initial path: [${sourceId}]`));
+
+            while (queue.length > 0) {
+                const currentPath = queue.shift();
+                const currentId = currentPath[currentPath.length - 1];
+
+                steps.push(new AlgorithmStep('visit', {
+                    nodeId: currentId,
+                    path: currentPath,
+                    action: 'dequeue'
+                }, `Dequeued path: [${currentPath.join(' → ')}] - exploring from node ${currentId}`));
+
+                // Check if we reached the sink
+                if (currentId === sinkId) {
+                    steps.push(new AlgorithmStep('visit', {
+                        nodeId: currentId,
+                        path: currentPath,
+                        action: 'sink-reached'
+                    }, `Reached sink node ${sinkId}`));
+
+                    allPaths.push([...currentPath]);
+
+                    steps.push(new AlgorithmStep('path-found', {
+                        path: [...currentPath],
+                        pathIndex: allPaths.length - 1
+                    }, `Found complete path ${allPaths.length}: ${currentPath.join(' → ')}`));
+
+                    continue; // Don't explore further from sink
+                }
+
+                // Get neighbors
+                const neighbors = graph.getNeighbors(currentId);
+
+                steps.push(new AlgorithmStep('visit', {
+                    nodeId: currentId,
+                    path: currentPath,
+                    neighbors: neighbors,
+                    action: 'explore'
+                }, `Exploring neighbors of node ${currentId}: [${neighbors.join(', ')}]`));
+
+                // Explore each neighbor
+                for (const neighborId of neighbors) {
+                    // Check if neighbor is already in current path (avoid cycles)
+                    if (currentPath.includes(neighborId)) {
+                        steps.push(new AlgorithmStep('explore-edge', {
+                            from: currentId,
+                            to: neighborId,
+                            path: currentPath,
+                            skipped: true,
+                            reason: 'in-current-path'
+                        }, `Skipping node ${neighborId} - already in current path`));
+                        continue;
+                    }
+
+                    // Create new path by extending current path
+                    const newPath = [...currentPath, neighborId];
+
+                    steps.push(new AlgorithmStep('explore-edge', {
+                        from: currentId,
+                        to: neighborId,
+                        path: currentPath,
+                        skipped: false
+                    }, `Traversing edge ${currentId} → ${neighborId}`));
+
+                    steps.push(new AlgorithmStep('visit', {
+                        nodeId: neighborId,
+                        path: newPath,
+                        action: 'enqueue'
+                    }, `Enqueued path: [${newPath.join(' → ')}]`));
+
+                    // Add new path to queue
+                    queue.push(newPath);
+                }
+            }
+
+            steps.push(new AlgorithmStep('complete', {
+                totalPaths: allPaths.length,
+                paths: allPaths
+            }, `Search complete! Found ${allPaths.length} path(s) from ${sourceId} to ${sinkId} using BFS`));
+
+            return { steps, paths: allPaths };
+        }
     }
 };
 
 // Future algorithms can be added here:
-// 'bfs-shortest-path': { ... },
 // 'dijkstra': { ... },
 // 'topological-sort': { ... },
 // etc.
