@@ -10,8 +10,8 @@ class AlgorithmStep {
 
 const Algorithms = {
     'dfs-all-paths': {
-        name: "DFS - All Paths (No Shared Nodes)",
-        description: "Depth-First Search to find all paths from source to sink where no two paths share any nodes except source and sink. This is useful for finding node-disjoint paths in a directed acyclic graph.",
+        name: "DFS - All Paths",
+        description: "Depth-First Search to find all possible paths from source to sink in a directed acyclic graph. Explores every possible route through the graph.",
 
         execute: function(graph, sourceId = null, sinkId = null) {
             const steps = [];
@@ -44,9 +44,6 @@ const Algorithms = {
                 action: 'start'
             }, `Starting DFS from node ${sourceId} to find all paths to node ${sinkId}`));
 
-            // Track globally used nodes across all found paths
-            const globallyUsedNodes = new Set([sourceId, sinkId]);
-
             // Recursive DFS function
             function dfs(currentId, currentPath, visited) {
                 // Check if we reached the sink
@@ -58,11 +55,6 @@ const Algorithms = {
                         path: pathCopy,
                         pathIndex: allPaths.length - 1
                     }, `Found complete path ${allPaths.length}: ${pathCopy.join(' → ')}`));
-
-                    // Mark all nodes in this path (except source and sink) as globally used
-                    for (let i = 1; i < pathCopy.length - 1; i++) {
-                        globallyUsedNodes.add(pathCopy[i]);
-                    }
 
                     return;
                 }
@@ -79,7 +71,7 @@ const Algorithms = {
 
                 // Explore each neighbor
                 for (const neighborId of neighbors) {
-                    // Skip if already visited in current path
+                    // Skip if already visited in current path (prevents cycles)
                     if (visited.has(neighborId)) {
                         steps.push(new AlgorithmStep('explore-edge', {
                             from: currentId,
@@ -88,18 +80,6 @@ const Algorithms = {
                             skipped: true,
                             reason: 'in-current-path'
                         }, `Skipping node ${neighborId} - already in current path`));
-                        continue;
-                    }
-
-                    // Skip if used in another found path (except if it's the sink)
-                    if (globallyUsedNodes.has(neighborId) && neighborId !== sinkId) {
-                        steps.push(new AlgorithmStep('explore-edge', {
-                            from: currentId,
-                            to: neighborId,
-                            path: [...currentPath],
-                            skipped: true,
-                            reason: 'globally-used'
-                        }, `Skipping node ${neighborId} - used in another path`));
                         continue;
                     }
 
@@ -134,7 +114,7 @@ const Algorithms = {
             steps.push(new AlgorithmStep('complete', {
                 totalPaths: allPaths.length,
                 paths: allPaths
-            }, `Search complete! Found ${allPaths.length} node-disjoint path(s) from ${sourceId} to ${sinkId}`));
+            }, `Search complete! Found ${allPaths.length} path(s) from ${sourceId} to ${sinkId}`));
 
             return { steps, paths: allPaths };
         }
