@@ -250,5 +250,77 @@ const Examples = {
 
             return graph;
         }
+    },
+
+    'node-disjoint': {
+        name: "Node-Disjoint DAG (20 nodes)",
+        description: "A DAG with completely separate parallel paths - no intermediate nodes are shared between paths",
+        createGraph: function() {
+            const graph = new Graph();
+
+            // Source
+            graph.addNode(0, "0", 200, 50);
+
+            // Path 1: 0 → 1 → 2 → 3 → 4 → 17 → 19 (5 intermediate nodes)
+            graph.addNode(1, "1", 80, 130);
+            graph.addNode(2, "2", 80, 210);
+            graph.addNode(3, "3", 80, 290);
+            graph.addNode(4, "4", 80, 370);
+            graph.addNode(17, "17", 120, 450);
+
+            // Path 2: 0 → 5 → 6 → 7 → 8 → 18 → 19 (5 intermediate nodes)
+            graph.addNode(5, "5", 160, 130);
+            graph.addNode(6, "6", 160, 210);
+            graph.addNode(7, "7", 160, 290);
+            graph.addNode(8, "8", 160, 370);
+            graph.addNode(18, "18", 180, 450);
+
+            // Path 3: 0 → 9 → 10 → 11 → 12 → 19 (4 intermediate nodes)
+            graph.addNode(9, "9", 240, 130);
+            graph.addNode(10, "10", 240, 210);
+            graph.addNode(11, "11", 240, 290);
+            graph.addNode(12, "12", 240, 370);
+
+            // Path 4: 0 → 13 → 14 → 15 → 16 → 19 (4 intermediate nodes)
+            graph.addNode(13, "13", 320, 130);
+            graph.addNode(14, "14", 320, 210);
+            graph.addNode(15, "15", 320, 290);
+            graph.addNode(16, "16", 320, 370);
+
+            // Sink
+            graph.addNode(19, "19", 200, 530);
+
+            // Add edges for Path 1
+            graph.addEdge(0, 1);
+            graph.addEdge(1, 2);
+            graph.addEdge(2, 3);
+            graph.addEdge(3, 4);
+            graph.addEdge(4, 17);
+            graph.addEdge(17, 19);
+
+            // Add edges for Path 2
+            graph.addEdge(0, 5);
+            graph.addEdge(5, 6);
+            graph.addEdge(6, 7);
+            graph.addEdge(7, 8);
+            graph.addEdge(8, 18);
+            graph.addEdge(18, 19);
+
+            // Add edges for Path 3
+            graph.addEdge(0, 9);
+            graph.addEdge(9, 10);
+            graph.addEdge(10, 11);
+            graph.addEdge(11, 12);
+            graph.addEdge(12, 19);
+
+            // Add edges for Path 4
+            graph.addEdge(0, 13);
+            graph.addEdge(13, 14);
+            graph.addEdge(14, 15);
+            graph.addEdge(15, 16);
+            graph.addEdge(16, 19);
+
+            return graph;
+        }
     }
 };
