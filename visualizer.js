@@ -116,8 +116,30 @@ class GraphVisualizer {
         text.setAttribute('y', 5);
         text.textContent = node.label;
 
+        // Create visit count badge (initially hidden)
+        const badgeGroup = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+        badgeGroup.setAttribute('class', 'visit-badge');
+        badgeGroup.setAttribute('data-visit-count', '0');
+        badgeGroup.style.display = 'none';
+
+        const badgeCircle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+        badgeCircle.setAttribute('class', 'badge-circle');
+        badgeCircle.setAttribute('r', 10);
+        badgeCircle.setAttribute('cx', 18);
+        badgeCircle.setAttribute('cy', -18);
+
+        const badgeText = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+        badgeText.setAttribute('class', 'badge-text');
+        badgeText.setAttribute('x', 18);
+        badgeText.setAttribute('y', -14);
+        badgeText.textContent = '0';
+
+        badgeGroup.appendChild(badgeCircle);
+        badgeGroup.appendChild(badgeText);
+
         group.appendChild(circle);
         group.appendChild(text);
+        group.appendChild(badgeGroup);
         this.nodesGroup.appendChild(group);
     }
 
@@ -174,6 +196,31 @@ class GraphVisualizer {
         }
     }
 
+    updateVisitCount(nodeId, count) {
+        const nodeGroup = this.nodesGroup.querySelector(`[data-node-id="${nodeId}"]`);
+        if (nodeGroup) {
+            const badge = nodeGroup.querySelector('.visit-badge');
+            const badgeText = nodeGroup.querySelector('.badge-text');
+
+            if (badge && badgeText) {
+                badge.setAttribute('data-visit-count', count);
+                badgeText.textContent = count;
+                badge.style.display = count > 0 ? 'block' : 'none';
+            }
+        }
+    }
+
+    resetVisitCounts() {
+        this.nodesGroup.querySelectorAll('.visit-badge').forEach(badge => {
+            badge.setAttribute('data-visit-count', '0');
+            badge.style.display = 'none';
+            const badgeText = badge.querySelector('.badge-text');
+            if (badgeText) {
+                badgeText.textContent = '0';
+            }
+        });
+    }
+
     resetHighlights() {
         // Reset all nodes
         this.nodesGroup.querySelectorAll('.node-circle').forEach(circle => {
@@ -208,6 +255,7 @@ class AnimationController {
         this.isPaused = false;
         this.speed = 1000; // milliseconds
         this.timeoutId = null;
+        this.visitCounts = new Map(); // Track visit counts for each node
 
         this.onStepChange = null;
         this.onComplete = null;
@@ -259,7 +307,9 @@ class AnimationController {
 
     reset() {
         this.currentStepIndex = 0;
+        this.visitCounts.clear();
         this.visualizer.resetHighlights();
+        this.visualizer.resetVisitCounts();
         if (this.onStepChange) {
             this.onStepChange(null, 0);
         }
@@ -308,6 +358,14 @@ class AnimationController {
 
         // Reset highlights before each step
         this.visualizer.resetHighlights();
+
+        // Increment visit count for visited nodes
+        if (step.type === 'visit' && step.data.nodeId !== undefined) {
+            const currentCount = this.visitCounts.get(step.data.nodeId) || 0;
+            const newCount = currentCount + 1;
+            this.visitCounts.set(step.data.nodeId, newCount);
+            this.visualizer.updateVisitCount(step.data.nodeId, newCount);
+        }
 
         switch (step.type) {
             case 'visit':
@@ -374,7 +432,9 @@ class AnimationController {
     }
 
     replayUpToCurrentStep() {
+        this.visitCounts.clear();
         this.visualizer.resetHighlights();
+        this.visualizer.resetVisitCounts();
         for (let i = 0; i < this.currentStepIndex; i++) {
             this.executeStep(i);
         }
