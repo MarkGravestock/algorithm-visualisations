@@ -6,6 +6,17 @@ on:
   pull_request:
     branches: [ main, master ]
 
+# Required for GitHub Pages deployment
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Allow one concurrent deployment
+concurrency:
+  group: "pages"
+  cancel-in-progress: true
+
 jobs:
   build-and-test:
     runs-on: ubuntu-latest
@@ -23,18 +34,23 @@ jobs:
       with:
         node-version: ${{ matrix.node-version }}
         cache: 'npm'
+        cache-dependency-path: machine-learning/package-lock.json
 
     - name: Install dependencies
+      working-directory: machine-learning
       run: npm ci
 
     - name: Run type checking
+      working-directory: machine-learning
       run: npx tsc --noEmit
 
     - name: Run tests with coverage
+      working-directory: machine-learning
       run: npm test -- --run --coverage
 
     - name: Display test results summary
       if: always()
+      working-directory: machine-learning
       run: |
         if [ -f test-results.json ]; then
           echo "## 🧪 Test Results Summary - Node ${{ matrix.node-version }}" >> $GITHUB_STEP_SUMMARY
@@ -73,9 +89,9 @@ jobs:
                     console.log('  ' + testStatus + ' ' + test.title);
                     if (test.status === 'failed' && test.failureMessages) {
                       test.failureMessages.forEach(msg => {
-                        console.log('    ```');
+                        console.log('    \`\`\`');
                         console.log('    ' + msg.split('\\n')[0]);
-                        console.log('    ```');
+                        console.log('    \`\`\`');
                       });
                     }
                   });
@@ -89,6 +105,7 @@ jobs:
 
     - name: Display coverage summary
       if: always()
+      working-directory: machine-learning
       run: |
         if [ -f coverage/coverage-summary.json ]; then
           echo "" >> $GITHUB_STEP_SUMMARY
@@ -114,22 +131,23 @@ jobs:
       with:
         name: test-results-node-${{ matrix.node-version }}
         path: |
-          test-results.json
-          coverage/
+          machine-learning/test-results.json
+          machine-learning/coverage/
         retention-days: 30
 
     - name: Upload coverage reports to Codecov
       if: matrix.node-version == '20.x'
       uses: codecov/codecov-action@v4
       with:
-        files: ./coverage/lcov.info
+        files: ./machine-learning/coverage/lcov.info
         flags: unittests
         name: codecov-umbrella
         fail_ci_if_error: false
       env:
         CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
 
-    - name: Build project
+    - name: Build machine-learning project
+      working-directory: machine-learning
       run: npm run build
 
     - name: Upload build artifacts
@@ -137,5 +155,51 @@ jobs:
       uses: actions/upload-artifact@v4
       with:
         name: build-artifacts
-        path: dist/
+        path: machine-learning/dist/
         retention-days: 30
+
+  deploy:
+    # Only deploy on pushes to main branch, not on PRs
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: build-and-test
+    runs-on: ubuntu-latest
+
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20.x'
+        cache: 'npm'
+        cache-dependency-path: machine-learning/package-lock.json
+
+    - name: Install dependencies
+      working-directory: machine-learning
+      run: npm ci
+
+    - name: Build machine-learning project
+      working-directory: machine-learning
+      run: npm run build
+
+    - name: Setup Pages
+      uses: actions/configure-pages@v4
+
+    - name: Prepare deployment directory
+      run: |
+        mkdir -p _site
+        cp index.html _site/
+        cp -r graph-traversal _site/
+        cp -r machine-learning/dist _site/machine-learning
+
+    - name: Upload artifact
+      uses: actions/upload-pages-artifact@v3
+
+    - name: Deploy to GitHub Pages
+      id: deployment
+      uses: actions/deploy-pages@v4
