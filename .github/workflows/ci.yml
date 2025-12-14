@@ -193,6 +193,7 @@ jobs:
     - name: Prepare deployment directory
       run: |
         mkdir -p _site
+        touch _site/.nojekyll
         cp index.html _site/
         cp -r graph-traversal _site/
         cp -r machine-learning/dist _site/machine-learning
