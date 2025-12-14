@@ -30,11 +30,13 @@ class GraphAnalyzer {
 const Algorithms = {
     'dfs-all-paths': {
         name: "DFS - All Paths",
-        description: "Depth-First Search to find all possible paths from source to sink in a directed acyclic graph. Explores every possible route through the graph.",
+        description: "Depth-First Search to find all possible paths from source to sink. WARNING: On graphs with cycles, this will explore cycles indefinitely until reaching max depth limit.",
 
         execute: function(graph, sourceId = null, sinkId = null) {
             const steps = [];
             const allPaths = [];
+            const MAX_DEPTH = 50;
+            let depthLimitReached = false;
 
             sourceId = sourceId ?? GraphAnalyzer.findSourceNode(graph);
             sinkId = sinkId ?? GraphAnalyzer.findSinkNode(graph);
@@ -70,14 +72,15 @@ const Algorithms = {
                     }, `Exploring neighbors of node ${currentId}: [${neighbors.join(', ')}]`));
                 },
 
-                recordSkippedNode: (currentId, neighborId, currentPath) => {
+                recordDepthLimitReached: (currentId, currentPath) => {
                     steps.push(new AlgorithmStep('explore-edge', {
                         from: currentId,
-                        to: neighborId,
+                        to: null,
                         path: [...currentPath],
                         skipped: true,
-                        reason: 'in-current-path'
-                    }, `Skipping node ${neighborId} - already in current path`));
+                        reason: 'max-depth'
+                    }, `⚠️ Maximum depth (${MAX_DEPTH}) reached at node ${currentId} - stopping exploration to prevent infinite cycles`));
+                    depthLimitReached = true;
                 },
 
                 recordEdgeTraversal: (currentId, neighborId, currentPath) => {
@@ -98,7 +101,12 @@ const Algorithms = {
                     }
                 },
 
-                exploreFrom: function(currentId, currentPath, visited) {
+                exploreFrom: function(currentId, currentPath) {
+                    if (currentPath.length > MAX_DEPTH) {
+                        this.recordDepthLimitReached(currentId, currentPath);
+                        return;
+                    }
+
                     if (currentId === sinkId) {
                         this.recordSinkReached(currentPath);
                         return;
@@ -108,31 +116,27 @@ const Algorithms = {
                     this.recordExplorationStart(currentId, currentPath, neighbors);
 
                     for (const neighborId of neighbors) {
-                        if (visited.has(neighborId)) {
-                            this.recordSkippedNode(currentId, neighborId, currentPath);
-                            continue;
-                        }
-
                         this.recordEdgeTraversal(currentId, neighborId, currentPath);
 
                         const newPath = [...currentPath, neighborId];
-                        const newVisited = new Set(visited);
-                        newVisited.add(neighborId);
-
-                        this.exploreFrom(neighborId, newPath, newVisited);
+                        this.exploreFrom(neighborId, newPath);
                     }
 
                     this.recordBacktrack(currentId, currentPath);
                 }
             };
 
-            const initialVisited = new Set([sourceId]);
-            dfsExplorer.exploreFrom(sourceId, [sourceId], initialVisited);
+            dfsExplorer.exploreFrom(sourceId, [sourceId]);
+
+            const completionMessage = depthLimitReached
+                ? `Search stopped at max depth ${MAX_DEPTH}. Found ${allPaths.length} path(s). Graph likely contains cycles!`
+                : `Search complete! Found ${allPaths.length} path(s) from ${sourceId} to ${sinkId}`;
 
             steps.push(new AlgorithmStep('complete', {
                 totalPaths: allPaths.length,
-                paths: allPaths
-            }, `Search complete! Found ${allPaths.length} path(s) from ${sourceId} to ${sinkId}`));
+                paths: allPaths,
+                depthLimitReached: depthLimitReached
+            }, completionMessage));
 
             return { steps, paths: allPaths };
         },
@@ -418,11 +422,14 @@ const Algorithms = {
 
     'bfs-all-paths': {
         name: "BFS - All Paths",
-        description: "Breadth-First Search to find all possible paths from source to sink. Explores paths level-by-level, finding shorter paths before longer ones. Uses a queue-based approach instead of recursion.",
+        description: "Breadth-First Search to find all possible paths from source to sink. WARNING: On graphs with cycles, this will explore cycles indefinitely until reaching max depth limit.",
 
         execute: function(graph, sourceId = null, sinkId = null) {
             const steps = [];
             const allPaths = [];
+            const MAX_DEPTH = 50;
+            const MAX_QUEUE_SIZE = 1000;
+            let limitReached = false;
 
             sourceId = sourceId ?? GraphAnalyzer.findSourceNode(graph);
             sinkId = sinkId ?? GraphAnalyzer.findSinkNode(graph);
@@ -479,14 +486,15 @@ const Algorithms = {
                     }, `Exploring neighbors of node ${currentId}: [${neighbors.join(', ')}]`));
                 },
 
-                recordSkippedNode: (currentId, neighborId, currentPath) => {
+                recordLimitReached: (reason) => {
                     steps.push(new AlgorithmStep('explore-edge', {
-                        from: currentId,
-                        to: neighborId,
-                        path: currentPath,
+                        from: null,
+                        to: null,
+                        path: [],
                         skipped: true,
-                        reason: 'in-current-path'
-                    }, `Skipping node ${neighborId} - already in current path`));
+                        reason: 'limit-reached'
+                    }, `⚠️ ${reason} - stopping to prevent infinite cycles`));
+                    limitReached = true;
                 },
 
                 recordEdgeTraversal: (currentId, neighborId, currentPath) => {
@@ -501,10 +509,20 @@ const Algorithms = {
 
             bfsExplorer.recordEnqueue([sourceId]);
 
-            while (queue.length > 0) {
-                const currentPath = queue.shift();
-                const currentId = currentPath[currentPath.length - 1];
+            while (queue.length > 0 && !limitReached) {
+                if (queue.length > MAX_QUEUE_SIZE) {
+                    bfsExplorer.recordLimitReached(`Queue size exceeded ${MAX_QUEUE_SIZE}`);
+                    break;
+                }
 
+                const currentPath = queue.shift();
+
+                if (currentPath.length > MAX_DEPTH) {
+                    bfsExplorer.recordLimitReached(`Path depth exceeded ${MAX_DEPTH}`);
+                    break;
+                }
+
+                const currentId = currentPath[currentPath.length - 1];
                 bfsExplorer.recordDequeue(currentPath, currentId);
 
                 if (currentId === sinkId) {
@@ -516,11 +534,6 @@ const Algorithms = {
                 bfsExplorer.recordExplorationStart(currentId, currentPath, neighbors);
 
                 for (const neighborId of neighbors) {
-                    if (currentPath.includes(neighborId)) {
-                        bfsExplorer.recordSkippedNode(currentId, neighborId, currentPath);
-                        continue;
-                    }
-
                     const newPath = [...currentPath, neighborId];
                     bfsExplorer.recordEdgeTraversal(currentId, neighborId, currentPath);
                     bfsExplorer.recordEnqueue(newPath);
@@ -529,10 +542,15 @@ const Algorithms = {
                 }
             }
 
+            const completionMessage = limitReached
+                ? `Search stopped due to limits. Found ${allPaths.length} path(s). Graph likely contains cycles!`
+                : `Search complete! Found ${allPaths.length} path(s) from ${sourceId} to ${sinkId} using BFS`;
+
             steps.push(new AlgorithmStep('complete', {
                 totalPaths: allPaths.length,
-                paths: allPaths
-            }, `Search complete! Found ${allPaths.length} path(s) from ${sourceId} to ${sinkId} using BFS`));
+                paths: allPaths,
+                limitReached: limitReached
+            }, completionMessage));
 
             return { steps, paths: allPaths };
         }

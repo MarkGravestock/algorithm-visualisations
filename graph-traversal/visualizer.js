@@ -83,11 +83,50 @@ class GraphVisualizer {
 
         if (!fromNode || !toNode) return;
 
-        const endpoints = this.calculateEdgeEndpoints(fromNode, toNode);
-        if (!endpoints) return;
+        const hasReverseEdge = this.graph.edges.some(e =>
+            e.from === edge.to && e.to === edge.from
+        );
 
-        const line = this.createEdgeLine(edge, endpoints);
-        this.edgesGroup.appendChild(line);
+        if (hasReverseEdge) {
+            this.drawCurvedEdge(fromNode, toNode, edge);
+        } else {
+            const endpoints = this.calculateEdgeEndpoints(fromNode, toNode);
+            if (!endpoints) return;
+            const line = this.createEdgeLine(edge, endpoints);
+            this.edgesGroup.appendChild(line);
+        }
+    }
+
+    drawCurvedEdge(fromNode, toNode, edge) {
+        const dx = toNode.x - fromNode.x;
+        const dy = toNode.y - fromNode.y;
+        const distance = Math.sqrt(dx * dx + dy * dy);
+
+        if (distance === 0) return;
+
+        const perpX = -dy / distance;
+        const perpY = dx / distance;
+
+        const curveOffset = 15;
+        const midX = (fromNode.x + toNode.x) / 2 + perpX * curveOffset;
+        const midY = (fromNode.y + toNode.y) / 2 + perpY * curveOffset;
+
+        const unitX = dx / distance;
+        const unitY = dy / distance;
+
+        const startX = fromNode.x + unitX * this.nodeRadius;
+        const startY = fromNode.y + unitY * this.nodeRadius;
+        const endX = toNode.x - unitX * (this.nodeRadius + 10);
+        const endY = toNode.y - unitY * (this.nodeRadius + 10);
+
+        const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+        path.setAttribute('class', 'edge-line');
+        path.setAttribute('d', `M ${startX} ${startY} Q ${midX} ${midY} ${endX} ${endY}`);
+        path.setAttribute('data-from', edge.from);
+        path.setAttribute('data-to', edge.to);
+        path.setAttribute('marker-end', 'url(#arrowhead)');
+
+        this.edgesGroup.appendChild(path);
     }
 
     calculateEdgeEndpoints(fromNode, toNode) {
@@ -211,9 +250,9 @@ class GraphVisualizer {
     }
 
     calculateFitScale(svgRect, bounds) {
-        const scaleX = (svgRect.width - 100) / bounds.graphWidth;
-        const scaleY = (svgRect.height - 100) / bounds.graphHeight;
-        return Math.min(scaleX, scaleY, 1.2);
+        const scaleX = (svgRect.width - 200) / bounds.graphWidth;
+        const scaleY = (svgRect.height - 200) / bounds.graphHeight;
+        return Math.min(scaleX, scaleY, 1.0);
     }
 
     calculateCenteringOffsets(svgRect, bounds) {
@@ -493,6 +532,18 @@ class AnimationController {
         if (!step.data.skipped) {
             this.visualizer.highlightEdge(step.data.from, step.data.to, 'active');
             this.visualizer.highlightNode(step.data.to, 'visiting');
+        } else if (step.data.reason === 'in-current-path') {
+            this.visualizer.highlightEdge(step.data.from, step.data.to, 'cycle');
+            this.visualizer.highlightNode(step.data.to, 'cycle');
+        } else if (step.data.reason === 'globally-used') {
+            this.visualizer.highlightEdge(step.data.from, step.data.to, 'skipped');
+            this.visualizer.highlightNode(step.data.to, 'skipped');
+        } else if (step.data.reason === 'max-depth' || step.data.reason === 'limit-reached') {
+            // Show warning state for depth/limit reached
+            if (step.data.from && step.data.to) {
+                this.visualizer.highlightEdge(step.data.from, step.data.to, 'warning');
+                this.visualizer.highlightNode(step.data.to, 'warning');
+            }
         }
         if (step.data.path) {
             this.highlightCurrentPath(step.data.path);

@@ -300,6 +300,29 @@ button:disabled {
     animation: cycle-pulse 1s ease-in-out;
 }
 
+.node-circle.skipped {
+    fill: #ffa500;
+    stroke: #ff8c00;
+    stroke-width: 3;
+    opacity: 0.7;
+}
+
+.node-circle.warning {
+    fill: #ffc107;
+    stroke: #ff9800;
+    stroke-width: 3;
+    animation: warning-blink 0.8s ease-in-out infinite;
+}
+
+@keyframes warning-blink {
+    0%, 100% {
+        opacity: 1;
+    }
+    50% {
+        opacity: 0.5;
+    }
+}
+
 @keyframes pulse {
     0%, 100% {
         transform: scale(1);
@@ -386,6 +409,20 @@ button:disabled {
     stroke-width: 4;
     stroke-dasharray: 5, 5;
     animation: cycle-dash 1s linear infinite;
+}
+
+.edge-line.skipped {
+    stroke: #ffa500;
+    stroke-width: 3;
+    stroke-dasharray: 8, 4;
+    opacity: 0.7;
+}
+
+.edge-line.warning {
+    stroke: #ffc107;
+    stroke-width: 3;
+    stroke-dasharray: 10, 5;
+    animation: warning-blink 0.8s ease-in-out infinite;
 }
 
 @keyframes cycle-dash {
