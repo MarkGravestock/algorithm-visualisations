@@ -1,0 +1,141 @@
+name: CI
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        node-version: [18.x, 20.x]
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup Node.js ${{ matrix.node-version }}
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ matrix.node-version }}
+        cache: 'npm'
+
+    - name: Install dependencies
+      run: npm ci
+
+    - name: Run type checking
+      run: npx tsc --noEmit
+
+    - name: Run tests with coverage
+      run: npm test -- --run --coverage
+
+    - name: Display test results summary
+      if: always()
+      run: |
+        if [ -f test-results.json ]; then
+          echo "## 🧪 Test Results Summary - Node ${{ matrix.node-version }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          node -e "
+            const fs = require('fs');
+            const results = JSON.parse(fs.readFileSync('./test-results.json', 'utf8'));
+
+            const total = results.numTotalTests || 0;
+            const passed = results.numPassedTests || 0;
+            const failed = results.numFailedTests || 0;
+            const skipped = results.numPendingTests || 0;
+            const duration = ((results.success ? 'passed' : 'failed'));
+
+            console.log('| Metric | Value |');
+            console.log('|--------|-------|');
+            console.log('| **Total Tests** | ' + total + ' |');
+            console.log('| **Passed** | ✅ ' + passed + ' |');
+            console.log('| **Failed** | ' + (failed > 0 ? '❌ ' : '✅ ') + failed + ' |');
+            console.log('| **Skipped** | ⏭️ ' + skipped + ' |');
+            console.log('| **Status** | ' + (failed === 0 ? '✅ All tests passed!' : '❌ Tests failed') + ' |');
+            console.log('');
+
+            if (results.testResults && results.testResults.length > 0) {
+              console.log('### 📋 Test Files');
+              console.log('');
+              results.testResults.forEach(testFile => {
+                const fileName = testFile.name.split('/').pop();
+                const fileStatus = testFile.status === 'passed' ? '✅' : '❌';
+                const fileDuration = ((testFile.endTime - testFile.startTime) / 1000).toFixed(2);
+                console.log('- ' + fileStatus + ' **' + fileName + '** (' + fileDuration + 's)');
+
+                if (testFile.assertionResults) {
+                  testFile.assertionResults.forEach(test => {
+                    const testStatus = test.status === 'passed' ? '  ✅' : '  ❌';
+                    console.log('  ' + testStatus + ' ' + test.title);
+                    if (test.status === 'failed' && test.failureMessages) {
+                      test.failureMessages.forEach(msg => {
+                        console.log('    ```');
+                        console.log('    ' + msg.split('\\n')[0]);
+                        console.log('    ```');
+                      });
+                    }
+                  });
+                }
+              });
+            }
+          " >> $GITHUB_STEP_SUMMARY
+        else
+          echo "⚠️ No test results found" >> $GITHUB_STEP_SUMMARY
+        fi
+
+    - name: Display coverage summary
+      if: always()
+      run: |
+        if [ -f coverage/coverage-summary.json ]; then
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "## 📊 Coverage Report - Node ${{ matrix.node-version }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          node -e "
+            const fs = require('fs');
+            const coverage = JSON.parse(fs.readFileSync('./coverage/coverage-summary.json', 'utf8'));
+            const total = coverage.total;
+
+            console.log('| Coverage Type | Percentage | Covered/Total |');
+            console.log('|---------------|------------|---------------|');
+            console.log('| **Statements** | ' + total.statements.pct + '% | ' + total.statements.covered + '/' + total.statements.total + ' |');
+            console.log('| **Branches** | ' + total.branches.pct + '% | ' + total.branches.covered + '/' + total.branches.total + ' |');
+            console.log('| **Functions** | ' + total.functions.pct + '% | ' + total.functions.covered + '/' + total.functions.total + ' |');
+            console.log('| **Lines** | ' + total.lines.pct + '% | ' + total.lines.covered + '/' + total.lines.total + ' |');
+          " >> $GITHUB_STEP_SUMMARY
+        fi
+
+    - name: Upload test results
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: test-results-node-${{ matrix.node-version }}
+        path: |
+          test-results.json
+          coverage/
+        retention-days: 30
+
+    - name: Upload coverage reports to Codecov
+      if: matrix.node-version == '20.x'
+      uses: codecov/codecov-action@v4
+      with:
+        files: ./coverage/lcov.info
+        flags: unittests
+        name: codecov-umbrella
+        fail_ci_if_error: false
+      env:
+        CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+
+    - name: Build project
+      run: npm run build
+
+    - name: Upload build artifacts
+      if: matrix.node-version == '20.x'
+      uses: actions/upload-artifact@v4
+      with:
+        name: build-artifacts
+        path: dist/
+        retention-days: 30
