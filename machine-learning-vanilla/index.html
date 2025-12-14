@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ice Cream Sales ML Predictor - Vanilla JS</title>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.15.0/dist/tf.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 12px;
+            padding: 30px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+        }
+
+        h1 {
+            color: #667eea;
+            margin-bottom: 10px;
+        }
+
+        .subtitle {
+            color: #666;
+            margin-bottom: 30px;
+        }
+
+        .controls {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 8px;
+        }
+
+        .control-group {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+
+        label {
+            font-weight: 500;
+            color: #333;
+            font-size: 0.9em;
+        }
+
+        input, select, button {
+            padding: 8px 12px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            font-size: 14px;
+        }
+
+        input:focus, select:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .button-group {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        button {
+            background: #667eea;
+            color: white;
+            border: none;
+            cursor: pointer;
+            font-weight: 500;
+            transition: background 0.3s;
+        }
+
+        button:hover {
+            background: #5568d3;
+        }
+
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+
+        button.stop {
+            background: #dc3545;
+        }
+
+        button.stop:hover {
+            background: #c82333;
+        }
+
+        .charts {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+
+        .chart-container {
+            position: relative;
+            height: 400px;
+        }
+
+        .info-panel {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+
+        .info-panel h3 {
+            color: #667eea;
+            margin-bottom: 10px;
+        }
+
+        .equation {
+            font-family: 'Courier New', monospace;
+            font-size: 1.1em;
+            color: #333;
+        }
+
+        .progress-bar {
+            width: 100%;
+            height: 6px;
+            background: #e0e0e0;
+            border-radius: 3px;
+            overflow: hidden;
+            margin-bottom: 20px;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: #667eea;
+            transition: width 0.3s;
+        }
+
+        .prediction-panel {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+
+        .prediction-inputs {
+            display: flex;
+            gap: 10px;
+            align-items: flex-end;
+            margin-bottom: 15px;
+        }
+
+        .prediction-result {
+            font-size: 1.2em;
+            color: #667eea;
+            font-weight: bold;
+        }
+
+        .data-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+
+        .data-table th,
+        .data-table td {
+            padding: 10px;
+            text-align: left;
+            border-bottom: 1px solid #ddd;
+        }
+
+        .data-table th {
+            background: #667eea;
+            color: white;
+        }
+
+        .data-table tr:hover {
+            background: #f8f9fa;
+        }
+
+        .data-table button {
+            padding: 4px 8px;
+            font-size: 0.85em;
+        }
+
+        @media (max-width: 768px) {
+            .charts {
+                grid-template-columns: 1fr;
+            }
+
+            .controls {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Ice Cream Sales ML Predictor</h1>
+        <p class="subtitle">Vanilla JavaScript - No Build Step Required</p>
+
+        <div class="controls">
+            <div class="control-group">
+                <label for="strategy">ML Strategy</label>
+                <select id="strategy">
+                    <option value="custom">Custom Gradient Descent</option>
+                    <option value="tensorflow">TensorFlow.js</option>
+                </select>
+            </div>
+            <div class="control-group">
+                <label for="numPoints">Data Points</label>
+                <input type="number" id="numPoints" value="50" min="10" max="500">
+            </div>
+            <div class="control-group">
+                <label for="epochs">Epochs</label>
+                <input type="number" id="epochs" value="100" min="10" max="1000">
+            </div>
+            <div class="control-group">
+                <label for="learningRate">Learning Rate</label>
+                <input type="number" id="learningRate" value="0.01" min="0.001" max="0.1" step="0.001">
+            </div>
+            <div class="control-group">
+                <label for="iterationDelay">Delay (ms)</label>
+                <input type="number" id="iterationDelay" value="0" min="0" max="1000">
+            </div>
+        </div>
+
+        <div class="button-group">
+            <button id="generateBtn">Generate New Data</button>
+            <button id="trainBtn">Train Model</button>
+            <button id="stopBtn" class="stop" style="display: none;">Stop Training</button>
+        </div>
+
+        <div class="progress-bar">
+            <div class="progress-fill" id="progressFill" style="width: 0%"></div>
+        </div>
+
+        <div class="info-panel">
+            <h3>Current Model</h3>
+            <p class="equation" id="equation">Not trained yet</p>
+        </div>
+
+        <div class="charts">
+            <div class="chart-container">
+                <canvas id="scatterChart"></canvas>
+            </div>
+            <div class="chart-container">
+                <canvas id="lossChart"></canvas>
+            </div>
+        </div>
+
+        <div class="prediction-panel">
+            <h3>Make a Prediction</h3>
+            <div class="prediction-inputs">
+                <div class="control-group">
+                    <label for="predictionTemp">Temperature (°C)</label>
+                    <input type="number" id="predictionTemp" value="25" step="0.1">
+                </div>
+                <button id="randomTempBtn">Random Temperature</button>
+                <button id="predictBtn">Predict Sales</button>
+            </div>
+            <p class="prediction-result" id="predictionResult"></p>
+        </div>
+
+        <details open>
+            <summary style="cursor: pointer; font-weight: bold; margin-bottom: 10px;">Data Table</summary>
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Temperature (°C)</th>
+                        <th>Ice Cream Sales</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="dataTableBody">
+                </tbody>
+            </table>
+        </details>
+    </div>
+
+    <script src="./ml.js"></script>
+    <script src="./app.js"></script>
+</body>
+</html>
