@@ -1,23 +1,24 @@
+export type TabType = '1d' | '2d' | 'nn';
+
 interface TabsProps {
-  activeTab: '1d' | '2d';
-  onTabChange: (tab: '1d' | '2d') => void;
+  activeTab: TabType;
+  onTabChange: (tab: TabType) => void;
 }
+
+const TAB_LABELS: Record<TabType, string> = {
+  '1d': '1 Variable (Temperature)',
+  '2d': '2 Variables (Temperature + Unemployment)',
+  nn: 'Neural Network (Heatwave)',
+};
 
 export function Tabs({ activeTab, onTabChange }: TabsProps) {
   return (
     <div className="tabs">
-      <button
-        className={`tab ${activeTab === '1d' ? 'active' : ''}`}
-        onClick={() => onTabChange('1d')}
-      >
-        1 Variable (Temperature)
-      </button>
-      <button
-        className={`tab ${activeTab === '2d' ? 'active' : ''}`}
-        onClick={() => onTabChange('2d')}
-      >
-        2 Variables (Temperature + Unemployment)
-      </button>
+      {(Object.keys(TAB_LABELS) as TabType[]).map((tab) => (
+        <button key={tab} className={`tab ${activeTab === tab ? 'active' : ''}`} onClick={() => onTabChange(tab)}>
+          {TAB_LABELS[tab]}
+        </button>
+      ))}
     </div>
   );
 }

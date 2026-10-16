@@ -29,6 +29,8 @@ An interactive TypeScript + React application demonstrating linear regression in
   - Random temperature generator
   - Visual prediction results on graph
 
+- **Neural Network tab**: a 1 → 2 → 2 → 1 network fitted to "heatwave" data where sales peak and then fall (see below)
+
 - **Data Management**:
   - Random data generation with realistic noise
   - Editable data table (modify/delete points)
@@ -69,7 +71,7 @@ npm run preview
 npm test
 ```
 
-All 12 tests validate both ML implementations using a shared test suite:
+The linear regression tests run one shared suite against both the Custom and TensorFlow.js implementations:
 - Parameter learning accuracy
 - Loss reduction over training
 - Prediction accuracy
@@ -103,6 +105,16 @@ Both implementations use:
 - Single-layer dense neural network
 - SGD optimizer
 - Automatic differentiation for gradient computation
+
+### Neural Network Tab
+Sales follow an inverted U (`sales ≈ 100 − 0.3 × (temperature − 28)²`), which no straight line can fit. A network with one input, two hidden layers of two neurons and one linear output learns the curve:
+- **Custom**: hand-written forward pass and backpropagation (`src/ml/neuralNetworkMaths.ts`), checked against numerical gradients in the tests
+- **TensorFlow.js**: the same architecture, with gradients from automatic differentiation
+- Both start from the same seeded weights, so they can be compared like for like
+- The diagram shows each weight and each neuron's output for a chosen temperature; the neuron chart shows how each hidden neuron responds across the whole range
+- Try `sigmoid` (slower to learn) or `ReLU` (neurons can "die" and get stuck) to see why the activation function matters
+
+Further reading: [Neural Networks and Deep Learning, ch. 2 (backpropagation)](http://neuralnetworksanddeeplearning.com/chap2.html), [3Blue1Brown: Neural networks](https://www.3blue1brown.com/topics/neural-networks), [TensorFlow Playground](https://playground.tensorflow.org/).
 
 ## Project Structure
 
