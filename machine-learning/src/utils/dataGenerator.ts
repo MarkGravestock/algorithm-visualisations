@@ -82,6 +82,36 @@ function sortByTemperature2D(data: DataPoint2D[]): DataPoint2D[] {
   return data.sort((a, b) => a.x1 - b.x1);
 }
 
+// Sales climb with temperature, peak, then fall away on scorching days when people stay indoors.
+// A straight line can't bend to follow this; a small neural network can.
+const PEAK_TEMPERATURE = 28;
+const PEAK_SALES = 100;
+const HEAT_FALL_OFF = 0.3;
+const MIN_HEATWAVE_TEMPERATURE = 12;
+const MAX_HEATWAVE_TEMPERATURE = 40;
+
+export function generateHeatwaveIceCreamData(count: number): DataPoint[] {
+  const data: DataPoint[] = [];
+
+  for (let i = 0; i < count; i++) {
+    const temperature = MIN_HEATWAVE_TEMPERATURE + Math.random() * (MAX_HEATWAVE_TEMPERATURE - MIN_HEATWAVE_TEMPERATURE);
+    const sales = calculateHeatwaveSalesWithNoise(temperature);
+
+    data.push({
+      x: roundToOneDecimal(temperature),
+      y: Math.round(sales),
+    });
+  }
+
+  return sortByTemperature(data);
+}
+
+function calculateHeatwaveSalesWithNoise(temperature: number): number {
+  const baseSales = PEAK_SALES - HEAT_FALL_OFF * (temperature - PEAK_TEMPERATURE) ** 2;
+  const noise = (Math.random() - 0.5) * NOISE_RANGE;
+  return Math.max(0, baseSales + noise);
+}
+
 export function validateDataPoint(temperature: number, sales: number): boolean {
   return isValidNumber(temperature) && isValidNumber(sales);
 }

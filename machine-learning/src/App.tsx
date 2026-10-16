@@ -1,5 +1,6 @@
 import { useState, useRef } from 'react';
-import { Tabs } from './components/Tabs';
+import { Tabs, TabType } from './components/Tabs';
+import { NeuralNetworkTab } from './components/NeuralNetworkTab';
 import { ScatterChart } from './components/ScatterChart';
 import { ScatterChart3D } from './components/ScatterChart3D';
 import { LossChart } from './components/LossChart';
@@ -14,7 +15,6 @@ import { generateIceCreamData, generateIceCreamData2D } from './utils/dataGenera
 import './App.css';
 
 type MLStrategy = 'custom' | 'tensorflow';
-type TabType = '1d' | '2d';
 
 function App() {
   const [activeTab, setActiveTab] = useState<TabType>('1d');
@@ -204,7 +204,12 @@ function App() {
 
       <Tabs activeTab={activeTab} onTabChange={setActiveTab} />
 
-      <div className="container">
+      {/* Kept mounted while hidden so each tab keeps its data and trained model */}
+      <div hidden={activeTab !== 'nn'}>
+        <NeuralNetworkTab />
+      </div>
+
+      <div className="container" hidden={activeTab === 'nn'}>
         <div className="controls-section">
           <h2>Configuration</h2>
 
@@ -440,7 +445,7 @@ function App() {
         </div>
       )}
 
-      <div className="data-section">
+      <div className="data-section" hidden={activeTab === 'nn'}>
         <h2>Training Data (Editable)</h2>
         {activeTab === '1d' ? (
           <DataTable data={data1D} onDataChange={setData1D} />
